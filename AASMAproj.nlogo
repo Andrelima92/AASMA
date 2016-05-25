@@ -13,7 +13,7 @@ breed [preys prey]
 ;;;
 ;;;  Declare cells' properties
 ;;;
-
+patches-own [kind shelf-color]
 
 wolves-own[fov]
 preys-own [init_xcor init_ycor]
@@ -38,7 +38,7 @@ end
 ;;;  Setup patches.
 ;;;
 to setup-patches
-  resize-world 0 20 0 20
+  resize-world 0 world_size 0 world_size
   ask patches [ set pcolor white ]
   ask patches with [ (pxcor + pycor) mod 2 = 0 ][ set pcolor gray + 4.5 ]
 end
@@ -52,7 +52,7 @@ to setup-turtles
 create-wolves 4[
   set color blue
   set label who
-  set fov 10
+  set fov floor (world_size * (fov_percentage / 100))
   set label-color black
   set size .9
   set-random-position
@@ -168,6 +168,7 @@ end
  to-report posy
    report ycor
  end
+
  to wolf-reactive-loop
 
    ifelse  in-sight[
@@ -263,7 +264,7 @@ to-report in-sight
        set preyX posx
        set preyY posY
      ]
-  report max list abs (preyX - xcor) abs (preyY - ycor) < fov
+  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
 end
 
 
@@ -275,16 +276,16 @@ to-report in-corner
        set preyY posY
      ]
   report (((preyX = 0) and ( preyY = 0)) or
-         ((preyX = 0) and ( preyY = 20)) or
-         ((preyX = 20) and (preyY = 0)) or
-         ((preyX = 20) and (preyY = 20)))
+         ((preyX = 0) and ( preyY = world_size)) or
+         ((preyX = world_size) and (preyY = 0)) or
+         ((preyX = world_size) and (preyY = world_size)))
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
-210
-10
-493
-314
+248
+26
+1168
+967
 -1
 -1
 13.0
@@ -298,9 +299,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-20
+69
 0
-20
+69
 0
 0
 1
@@ -308,10 +309,10 @@ ticks
 30.0
 
 BUTTON
-80
-62
-145
-95
+12
+27
+77
+60
 NIL
 Reset
 NIL
@@ -325,10 +326,10 @@ NIL
 1
 
 BUTTON
-137
-163
-200
-196
+148
+27
+211
+60
 go
 go
 T
@@ -342,10 +343,10 @@ NIL
 1
 
 BUTTON
-51
-102
-114
-135
+81
+27
+144
+60
 step
 tick
 NIL
@@ -357,6 +358,36 @@ NIL
 NIL
 NIL
 1
+
+SLIDER
+21
+87
+193
+120
+world_size
+world_size
+10
+100
+69
+1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+20
+142
+192
+175
+fov_percentage
+fov_percentage
+0
+50
+50
+1
+1
+NIL
+HORIZONTAL
 
 @#$#@#$#@
 ## WHAT IS IT?
