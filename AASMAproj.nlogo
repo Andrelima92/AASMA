@@ -13,7 +13,7 @@ breed [preys prey]
 ;;;
 ;;;  Declare cells' properties
 ;;;
-patches-own [kind shelf-color]
+
 
 wolves-own[fov]
 preys-own [init_xcor init_ycor]
@@ -263,7 +263,7 @@ to-report in-sight
        set preyX posx
        set preyY posY
      ]
-  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
+  report max list abs (preyX - xcor) abs (preyY - ycor) < fov
 end
 
 
@@ -279,7 +279,6 @@ to-report in-corner
          ((preyX = 20) and (preyY = 0)) or
          ((preyX = 20) and (preyY = 20)))
 end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
