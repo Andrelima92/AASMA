@@ -1,7 +1,7 @@
 ;;;
 ;;;  Global variables and constants
 ;;;
-globals [ROOM_FLOOR  COLOR_BLUE COLOR_GREEN COLOR_YELLOW COLOR_RED]
+globals [worldX worldY]
 
 ;;;
 ;;;  Declare two types of turtles
@@ -15,7 +15,7 @@ breed [preys prey]
 ;;;
 patches-own [kind shelf-color]
 
-wolves-own[init_xcor init_ycor]
+wolves-own[fov]
 preys-own [init_xcor init_ycor]
 
 ;;;
@@ -52,6 +52,7 @@ to setup-turtles
 create-wolves 4[
   set color blue
   set label who
+  set fov 10
   set label-color black
   set size .9
   set-random-position
@@ -83,13 +84,14 @@ end
 
 to go
   tick
-  ask wolves[
-    ;move-ahead
-    move-down
-  ]
+
   ask preys[
-    move-ahead
+    prey-loop
     ]
+  ask wolves[
+    wolf-reactive-loop
+  ]
+
 end
  ; tick
   ;ask wolves [
@@ -158,9 +160,126 @@ to-report legal-move? [x y]
 end
 
 
-to-report is-corner? [x y]
-  ;report (
-  end
+
+ to-report posX
+   report xcor
+ end
+
+ to-report posy
+   report ycor
+ end
+ to wolf-reactive-loop
+
+   ifelse  in-sight[
+     let preyX 0
+     let preyY 0
+     let corner 0
+
+     ask preys [
+      set preyX posX
+      set preyY posY
+      ifelse in-corner
+      [ set corner 1]
+      [set corner 0]
+
+     ]
+     ifelse corner = 1
+     [
+       ifelse preyX < xcor[
+          move-ahead
+     ]
+      [
+        ifelse preyY < ycor[
+        move-up
+        ]
+        [
+          ifelse preyX > xcor[
+            move-back
+          ]
+          [
+            move-down
+          ]
+          ]
+        ]
+      ]
+
+     [
+       ifelse preyX > xcor[
+          move-ahead
+     ]
+      [
+        ifelse preyY > ycor[
+        move-up
+        ]
+        [
+          ifelse preyX < xcor[
+            move-back
+          ]
+          [
+            move-down
+          ]
+          ]
+        ]
+     ]
+   ]
+   [
+     let i random 4
+     if i = 0 [
+    move-up
+              ]
+  if i = 1[
+    move-down
+        ]
+  if i = 2[
+    move-ahead
+       ]
+  if i = 3[
+    move-back
+      ]
+   ]
+
+ end
+
+to prey-loop
+  let i random 5
+  if i = 0 [
+    move-up
+  ]
+  if i = 1[
+    move-down
+  ]
+  if i = 2[
+    move-ahead
+  ]
+  if i = 3[
+    move-back
+  ]
+end
+
+to-report in-sight
+    let preyX 0
+     let preyY 0
+     ask preys [
+       set preyX posx
+       set preyY posY
+     ]
+  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
+end
+
+
+to-report in-corner
+  let preyX 0
+     let preyY 0
+     ask preys [
+       set preyX posx
+       set preyY posY
+     ]
+  report (((preyX = 0) and ( preyY = 0)) or
+         ((preyX = 0) and ( preyY = 20)) or
+         ((preyX = 20) and (preyY = 0)) or
+         ((preyX = 20) and (preyY = 20)))
+end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
