@@ -110,65 +110,14 @@ end
 ;;;  =================================================================
 ;;;
 
+
+
 ;;;
 ;;; ------------------------
-;;;   Actuators
+;;;   Loops
 ;;; ------------------------
 ;;;
-
-to move-ahead
-  let next-x xcor + 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-back
-  let next-x xcor - 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-up
-  let next-x xcor + 0
-  let next-y ycor + 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-down
-  let next-x xcor + 0
-  let next-y ycor - 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-
-to-report legal-move? [x y]
-  report (
-    (not any? wolves-on patch x y) and
-    (not any? preys-on patch x y))
-end
-
-
-
- to-report posX
-   report xcor
- end
-
- to-report posy
-   report ycor
- end
- to wolf-reactive-loop
+to wolf-reactive-loop
 
    ifelse  in-sight[
      let preyX 0
@@ -240,6 +189,9 @@ end
 
  end
 
+
+
+
 to prey-loop
   let i random 5
   if i = 0 [
@@ -256,6 +208,13 @@ to prey-loop
   ]
 end
 
+
+
+;;;
+;;; ------------------------
+;;;   Sensors
+;;; ------------------------
+;;;
 to-report in-sight
     let preyX 0
      let preyY 0
@@ -265,7 +224,6 @@ to-report in-sight
      ]
   report max list abs (preyX - xcor) abs (preyY - ycor) < fov
 end
-
 
 to-report in-corner
   let preyX 0
@@ -279,6 +237,76 @@ to-report in-corner
          ((preyX = 20) and (preyY = 0)) or
          ((preyX = 20) and (preyY = 20)))
 end
+;;;
+;;; ------------------------
+;;;   Actuators
+;;; ------------------------
+;;;
+
+to move-ahead
+  let next-x xcor + 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-back
+  let next-x xcor - 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-up
+  let next-x xcor + 0
+  let next-y ycor + 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-down
+  let next-x xcor + 0
+  let next-y ycor - 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+
+;;;
+;;; ------------------------
+;;;   Auxiliars
+;;; ------------------------
+;;;
+to-report legal-move? [x y]
+  report (
+    (not any? wolves-on patch x y) and
+    (not any? preys-on patch x y))
+end
+
+
+
+ to-report posX
+   report xcor
+ end
+
+ to-report posy
+   report ycor
+ end
+
+
+
+
+
+
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 210
