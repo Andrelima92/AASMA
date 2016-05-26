@@ -111,65 +111,13 @@ end
 ;;;  =================================================================
 ;;;
 
+
+
 ;;;
 ;;; ------------------------
-;;;   Actuators
+;;;   Loops
 ;;; ------------------------
 ;;;
-
-to move-ahead
-  let next-x xcor + 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-back
-  let next-x xcor - 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-up
-  let next-x xcor + 0
-  let next-y ycor + 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-down
-  let next-x xcor + 0
-  let next-y ycor - 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-
-to-report legal-move? [x y]
-  report (
-    (not any? wolves-on patch x y) and
-    (not any? preys-on patch x y))
-end
-
-
-
- to-report posX
-   report xcor
- end
-
- to-report posy
-   report ycor
- end
-
  to wolf-reactive-loop
 
    ifelse  in-sight[
@@ -242,6 +190,9 @@ end
 
  end
 
+
+
+
 to prey-loop
   let i random 5
   if i = 0 [
@@ -258,6 +209,13 @@ to prey-loop
   ]
 end
 
+
+
+;;;
+;;; ------------------------
+;;;   Sensors
+;;; ------------------------
+;;;
 to-report in-sight
     let preyX 0
      let preyY 0
@@ -265,9 +223,8 @@ to-report in-sight
        set preyX posx
        set preyY posY
      ]
-  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
+  report max ( list abs ( preyX - xcor )  abs ( preyY - ycor )  ) < fov
 end
-
 
 to-report in-corner
   let preyX 0
@@ -281,19 +238,101 @@ to-report in-corner
          ((preyX = world_size) and (preyY = 0)) or
          ((preyX = world_size) and (preyY = world_size)))
 end
+;;;
+;;; ------------------------
+;;;   Actuators
+;;; ------------------------
+;;;
+
+to move-ahead
+  let next-x xcor + 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-back
+  let next-x xcor - 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-up
+  let next-x xcor + 0
+  let next-y ycor + 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-down
+  let next-x xcor + 0
+  let next-y ycor - 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+
+;;;
+;;; ------------------------
+;;;   Auxiliars
+;;; ------------------------
+;;;
+to-report legal-move? [x y]
+  report (
+    (not any? wolves-on patch x y) and
+    (not any? preys-on patch x y))
+end
+
+
+
+ to-report posX
+   report xcor
+ end
+
+ to-report posy
+   report ycor
+ end
+
+to-report in-range-pos [x y]
+  report max ( list abs (x  - xcor )  abs ( y - ycor )  ) < fov
+end
+
+to send-message-to-wolf [id-wolf msg myId]
+  ask turtle id-wolf [receive-message msg myId]
+end
 
 to receive-message [ sender msg ]
-  set replace-item sender wolves_plan msg
+  set wolves_plan replace-item sender wolves_plan msg
 end
+
+
+to pass-message [dir]
+ let myId label
+ let myX xcor
+ let myY ycor
+ ask wolves [
+   if in-range-pos myX myY
+       [ send-message-to-wolf label dir myId]
+ ]
+ end
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
 26
-661
-460
+493
+222
 -1
 -1
-13.0
+15.0
 1
 10
 1
@@ -304,9 +343,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-30
+10
 0
-30
+10
 0
 0
 1
@@ -373,7 +412,7 @@ world_size
 world_size
 10
 100
-30
+10
 1
 1
 NIL
@@ -388,7 +427,7 @@ fov_percentage
 fov_percentage
 0
 50
-24
+50
 1
 1
 NIL
