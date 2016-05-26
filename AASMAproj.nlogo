@@ -1,7 +1,7 @@
 ;;;
 ;;;  Global variables and constants
 ;;;
-globals [worldX worldY]
+globals [worldX worldY UNKNOWN ROOM_FLOOR WOLF_TYPE PREY_TYPE]
 
 ;;;
 ;;;  Declare two types of turtles
@@ -114,6 +114,171 @@ end
 
 
 
+
+;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
+;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
+
+to-report adjacents [node mobjectivo]
+  let aux 0
+  let aux2 0
+
+  set aux2 []
+  set aux adjacent-positions-of-type (last first node) ROOM_FLOOR
+
+  foreach aux
+  [
+     set aux2 fput (list 0 ((item 1 first node) + 1) ?) aux2
+  ]
+
+
+  set aux []
+  foreach aux2
+  [
+    set aux fput (list (replace-item 0 ? (heuristic ? mobjectivo)) first node) aux
+  ]
+
+  report aux
+end
+
+
+
+;;;
+;;;  Add the distance to the goal position and the current node cost
+;;;
+to-report heuristic [node mgoal]
+  let cost 0
+  let x 0
+  let y 0
+
+  set cost item 1 node
+  set x first item 2 node
+  set y first butfirst item 2 node
+
+  report cost +
+         2 * (abs(x - item 0 mgoal) +  abs(y - item 1 mgoal))
+end
+
+
+
+to-report adjacent-positions-of-type [pos ttype]
+  let solution 0
+  let x item 0 pos
+  let y item 1 pos
+
+  set solution []
+
+  print "current exploring node:"
+  print pos
+
+
+  set solution fput (list x ((y - 1) mod (world_size + 1))) solution
+
+  set solution fput (list x ((y + 1) mod (world_size + 1))) solution
+
+  set solution fput (list ((x - 1) mod (world_size + 1)) y) solution
+
+  set solution fput (list ((x + 1) mod (world_size + 1)) y) solution
+
+;  foreach solution
+;  [ if not (read-map-position ? = (word "" ttype))
+;    [ set solution remove ? solution ] ]
+  report solution
+end
+
+
+
+to-report find-solution [node closed]
+  let solution 0
+  let parent 0
+
+
+  set solution (list last first node)
+  set parent item 1 node
+  while [not empty? parent] [
+    set parent first filter [ parent = first ? ] closed
+    set solution fput last first parent solution
+    set parent last parent
+  ]
+
+
+  report butfirst solution
+end
+
+
+;;;-------search algoritm (A star)--------------
+
+to-report find-path [intialPos FinalPos]
+  let opened 0
+  let closed 0
+  let aux 0
+  let aux2 0
+  let aux3 0
+  let to-explore 0
+
+  set to-explore []
+  set closed []
+  set opened []
+  set opened fput (list (list 0 0 intialPos) []) opened
+
+
+  while [not empty? opened]
+  [
+
+    set to-explore first opened
+    set opened remove to-explore opened
+    set closed fput to-explore closed
+
+
+    ifelse last first to-explore = FinalPos
+    [
+      report find-solution to-explore closed
+    ]
+    [
+
+      set aux adjacents to-explore FinalPos
+      foreach aux
+      [
+        set aux2 ?
+        set aux3 filter [ last first aux2 = last first ? and first first aux2 < first first ? ] opened
+        ifelse not empty? aux3
+        [
+          set opened remove first aux3 opened
+          set opened fput aux2 opened
+        ]
+        [
+          set aux3 filter [ last first aux2 = last first ? ] closed
+          ifelse not empty? aux3
+          [
+            if first first first aux3 > first first aux2
+              [
+                set closed remove first aux3 closed
+                set opened fput aux2 opened
+              ]
+          ]
+          [
+            set opened fput aux2 opened
+          ]
+        ]
+      ]
+
+      ;; orders the opened list according to the heuristic
+      set opened sort-by [ first first ?1 < first first ?2 ] opened
+    ]
+  ]
+  report []
+end
+
+
+;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
+;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+
+
 ;;;
 ;;; ------------------------
 ;;;   Loops
@@ -122,8 +287,30 @@ end
 
 
  to wolf-deliberative-loop
-   let a 0
-  set a choose-dir
+;  let a 0
+;  set a choose-dir
+
+   let preyX 0
+   let preyY 0
+
+   ask preys [
+    set preyX posX
+    set preyY posY
+
+   ]
+
+   let solution find-path (list xcor ycor) ( list preyX preyY )
+
+
+
+  let walkLimit world_size / 6
+  let walked 0
+  if(walked < walkLimit)
+  [
+    move-ahead
+  ]
+
+
  end
 
  to wolf-reactive-loop
@@ -372,7 +559,6 @@ to pass-message [dir]
        [ send-message-to-wolf label dir myId]
  ]
  end
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
