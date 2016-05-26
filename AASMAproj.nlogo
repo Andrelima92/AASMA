@@ -222,7 +222,7 @@ to-report in-sight
        set preyX posx
        set preyY posY
      ]
-  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
+  report max ( list abs ( preyX - xcor )  abs ( preyY - ycor )  ) < fov
 end
 
 to-report in-corner
@@ -301,20 +301,33 @@ end
    report ycor
  end
 
+to-report in-range-pos [x y]
+  report max ( list abs (x  - xcor )  abs ( y - ycor )  ) < fov
+end
+
+to send-message-to-wolf [id-wolf msg myId]
+  ask turtle id-wolf [receive-message msg myId]
+end
 
 
-
-
+to pass-message [dir]
+ let myId label
+ let myX xcor
+ let myY ycor
+ ask wolves [
+   if in-range-pos myX myY
+       [ send-message-to-robot label dir myId]
+ end
 
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
 26
 493
-200
+222
 -1
 -1
-13.0
+15.0
 1
 10
 1
