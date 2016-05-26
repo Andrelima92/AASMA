@@ -15,7 +15,7 @@ breed [preys prey]
 ;;;
 patches-own [kind shelf-color]
 
-wolves-own[fov]
+wolves-own[fov wolves_plan]
 preys-own [init_xcor init_ycor]
 
 ;;;
@@ -53,6 +53,7 @@ create-wolves 4[
   set color blue
   set label who
   set fov floor (world_size * (fov_percentage / 100))
+  set wolves_plan [-1 -1 -1 -1]
   set label-color black
   set size .9
   set-random-position
@@ -110,13 +111,65 @@ end
 ;;;  =================================================================
 ;;;
 
-
-
 ;;;
 ;;; ------------------------
-;;;   Loops
+;;;   Actuators
 ;;; ------------------------
 ;;;
+
+to move-ahead
+  let next-x xcor + 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-back
+  let next-x xcor - 1
+  let next-y ycor + 0
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-up
+  let next-x xcor + 0
+  let next-y ycor + 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+to move-down
+  let next-x xcor + 0
+  let next-y ycor - 1
+  if legal-move? next-x next-y[
+    set xcor next-x
+    set ycor next-y
+  ]
+end
+
+
+to-report legal-move? [x y]
+  report (
+    (not any? wolves-on patch x y) and
+    (not any? preys-on patch x y))
+end
+
+
+
+ to-report posX
+   report xcor
+ end
+
+ to-report posy
+   report ycor
+ end
+
  to wolf-reactive-loop
 
    ifelse  in-sight[
@@ -189,9 +242,6 @@ end
 
  end
 
-
-
-
 to prey-loop
   let i random 5
   if i = 0 [
@@ -208,13 +258,6 @@ to prey-loop
   ]
 end
 
-
-
-;;;
-;;; ------------------------
-;;;   Sensors
-;;; ------------------------
-;;;
 to-report in-sight
     let preyX 0
      let preyY 0
@@ -224,6 +267,7 @@ to-report in-sight
      ]
   report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
 end
+
 
 to-report in-corner
   let preyX 0
@@ -237,81 +281,16 @@ to-report in-corner
          ((preyX = world_size) and (preyY = 0)) or
          ((preyX = world_size) and (preyY = world_size)))
 end
-;;;
-;;; ------------------------
-;;;   Actuators
-;;; ------------------------
-;;;
 
-to move-ahead
-  let next-x xcor + 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
+to receive-message [ sender msg ]
+  set replace-item sender wolves_plan msg
 end
-
-to move-back
-  let next-x xcor - 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-up
-  let next-x xcor + 0
-  let next-y ycor + 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-to move-down
-  let next-x xcor + 0
-  let next-y ycor - 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
-  ]
-end
-
-
-;;;
-;;; ------------------------
-;;;   Auxiliars
-;;; ------------------------
-;;;
-to-report legal-move? [x y]
-  report (
-    (not any? wolves-on patch x y) and
-    (not any? preys-on patch x y))
-end
-
-
-
- to-report posX
-   report xcor
- end
-
- to-report posy
-   report ycor
- end
-
-
-
-
-
-
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
 26
-493
-200
+661
+460
 -1
 -1
 13.0
@@ -325,9 +304,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-10
+30
 0
-10
+30
 0
 0
 1
@@ -394,7 +373,7 @@ world_size
 world_size
 10
 100
-10
+30
 1
 1
 NIL
@@ -409,7 +388,7 @@ fov_percentage
 fov_percentage
 0
 50
-50
+24
 1
 1
 NIL
