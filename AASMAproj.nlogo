@@ -90,7 +90,8 @@ to go
     prey-loop
     ]
   ask wolves[
-    wolf-reactive-loop
+    ;wolf-reactive-loop
+    wolf-deliberative-loop
   ]
 
 end
@@ -118,6 +119,13 @@ end
 ;;;   Loops
 ;;; ------------------------
 ;;;
+
+
+ to wolf-deliberative-loop
+   let a 0
+  set a choose-dir
+ end
+
  to wolf-reactive-loop
 
    ifelse  in-sight[
@@ -238,6 +246,43 @@ to-report in-corner
          ((preyX = world_size) and (preyY = 0)) or
          ((preyX = world_size) and (preyY = world_size)))
 end
+
+to-report choose-dir
+     let preyX 0
+     let preyY 0
+     let left-distance 0
+     let right-distance 0
+     let up-distance 0
+     let down-distance 0
+     let minim 0
+     let lista-de-dist [ ]
+     let indexList [ ]
+     let plan -1
+     ask preys [
+       set preyX posx
+       set preyY posY
+     ]
+
+  set left-distance distance-to-pos (preyX - 1) preyY
+  set right-distance distance-to-pos (preyX + 1) preyY
+  set up-distance distance-to-pos preyX (preyY + 1)
+  set down-distance distance-to-pos preyX (preyY - 1)
+  set lista-de-dist (list left-distance right-distance up-distance down-distance)
+  set indexList n-values 4 [?]
+  set indexList sort-by [ (item ?1 lista-de-dist ) < (item ?2 lista-de-dist)] indexList
+
+
+  while [not empty? indexList] [
+  let usedPlan? empty? filter [ ? = first indexList] wolves_plan
+  ifelse usedPlan?
+       [
+         report first indexList]
+       [ set indexList remove first indexList indexList]
+  ]
+report -1
+end
+
+
 ;;;
 ;;; ------------------------
 ;;;   Actuators
@@ -305,6 +350,9 @@ end
 to-report in-range-pos [x y]
   report max ( list abs (x  - xcor )  abs ( y - ycor )  ) < fov
 end
+to-report distance-to-pos [x y]
+    report max ( list abs (x  - xcor )  abs ( y - ycor )  )
+end
 
 to send-message-to-wolf [id-wolf msg myId]
   ask turtle id-wolf [receive-message msg myId]
@@ -324,12 +372,13 @@ to pass-message [dir]
        [ send-message-to-wolf label dir myId]
  ]
  end
+
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
 26
 493
-222
+252
 -1
 -1
 15.0
@@ -343,9 +392,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-10
+12
 0
-10
+12
 0
 0
 1
@@ -412,7 +461,7 @@ world_size
 world_size
 10
 100
-10
+12
 1
 1
 NIL
