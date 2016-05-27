@@ -16,7 +16,7 @@ breed [preys prey]
 patches-own [kind shelf-color]
 
 wolves-own[fov wolves_plan]
-preys-own [init_xcor init_ycor]
+preys-own [fov init_xcor init_ycor]
 
 ;;;
 ;;;  Reset the simulation
@@ -90,21 +90,29 @@ to go
 
   ask preys[
     prey-loop
-    ]
+  ]
   ask wolves[
-    ;wolf-reactive-loop
-    wolf-deliberative-loop
+    wolf-loop
   ]
 
 end
- ; tick
-  ;ask wolves [
-   ; wolf-loop
-  ;]
- ;ask preys prey-loop
-  ;if prey-cornered = 1
-  ;[stop]
-;end
+
+to wolf-loop
+
+    ifelse(gang_movement = "REACTIVE")
+    [
+      reactive-loop
+    ]
+    [
+    ifelse(gang_movement = "DELIBERATIVE")
+    [
+      deliberative-loop
+    ]
+    [
+    ]
+    ]
+end
+
 
 ;;;
 ;;;  =================================================================
@@ -297,6 +305,27 @@ to seek [ point ]
 
 end
 
+
+to flee [ point ]
+
+  let nextDirX ((first point) - xcor)
+  let nextDirY ((last point) - ycor)
+
+  if(nextDirX > 0)[
+    move-back
+  ]
+  if(nextDirX < 0)[
+    move-ahead
+  ]
+  if(nextDirY > 0)[
+    move-down
+  ]
+  if(nextDirY < 0)[
+    move-up
+  ]
+
+end
+
 to-report zigZagWander[ point ]
   let nextPoint point
   let aux 0
@@ -344,7 +373,7 @@ end
 ;;;
 
 
- to wolf-deliberative-loop
+ to deliberative-loop
 
    let preyX 0
    let preyY 0
@@ -361,7 +390,7 @@ end
 
  end
 
- to wolf-reactive-loop
+ to reactive-loop
 
    ifelse  in-sight[
      let preyX 0
@@ -437,6 +466,58 @@ end
 
 
 to prey-loop
+  ifelse(prey_movement = "RANDOM")
+  [
+    random-loop
+  ]
+  [
+  ifelse(prey_movement = "REACTIVE")
+  [
+    reactive-loop
+  ]
+  [
+   ifelse(prey_movement = "FLEE")
+  [
+    flee-loop
+  ]
+  [
+   ifelse(prey_movement = "NAIVE")
+  [
+    naive-loop
+  ]
+  [
+  ]]]]
+end
+
+
+
+
+to naive-loop
+  seek list (world_size / 2) (world_size / 2)
+end
+
+
+to flee-loop
+  let averageX 0
+  let averageY 0
+  let counter 0;
+  ask wolves
+  [
+    set averageX (averageX + posX)
+    set averageY (averageY + posY)
+    set counter (counter + 1)
+  ]
+  set averageX (averageX / counter)
+  set averageY (averageY / counter)
+
+  let distanceX (averageX)
+  let distanceY (averageY)
+
+  flee list distanceX distanceY
+
+end
+
+to random-loop
   let i random 5
   if i = 0 [
     move-up
@@ -524,44 +605,110 @@ end
 ;;; ------------------------
 ;;;
 
-to move-ahead
-  let next-x xcor + 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
+to move-diag-tl
+  if(gang_legal_movement = "DIAGONALS")
+  [
+    let next-x xcor + 1
+    let next-y ycor + 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 45
   ]
-  set heading 90
+end
+
+to move-diag-tr
+  if(gang_legal_movement = "DIAGONALS")
+  [
+    let next-x xcor + 1
+    let next-y ycor - 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 125
+  ]
+end
+
+to move-diag-bl
+  if(gang_legal_movement = "DIAGONALS")
+  [
+    let next-x xcor - 1
+    let next-y ycor + 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 170
+  ]
+end
+
+
+to move-diag-br
+  if(gang_legal_movement = "DIAGONALS")
+  [
+    let next-x xcor - 1
+    let next-y ycor - 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 215
+  ]
+end
+
+
+to move-ahead
+  if(gang_legal_movement = "HORIZONTALS" or gang_legal_movement = "ORTHOGONAL")
+  [
+    let next-x xcor + 1
+    let next-y ycor + 0
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 90
+  ]
 end
 
 to move-back
-  let next-x xcor - 1
-  let next-y ycor + 0
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
+  if(gang_legal_movement = "HORIZONTALS" or gang_legal_movement = "ORTHOGONAL")
+  [
+    let next-x xcor - 1
+    let next-y ycor + 0
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 270
   ]
-  set heading 270
 end
 
 to move-up
-  let next-x xcor + 0
-  let next-y ycor + 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
+  if(gang_legal_movement = "VERTICALS" or gang_legal_movement = "ORTHOGONAL")
+  [
+    let next-x xcor + 0
+    let next-y ycor + 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 0
   ]
-  set heading 0
 end
 
 to move-down
-  let next-x xcor + 0
-  let next-y ycor - 1
-  if legal-move? next-x next-y[
-    set xcor next-x
-    set ycor next-y
+  if(gang_legal_movement = "VERTICALS" or gang_legal_movement = "ORTHOGONAL")
+  [
+    let next-x xcor + 0
+    let next-y ycor - 1
+    if legal-move? next-x next-y[
+      set xcor next-x
+      set ycor next-y
+    ]
+    set heading 180
   ]
-  set heading 180
 end
 
 
@@ -615,8 +762,8 @@ to pass-message [dir]
 GRAPHICS-WINDOW
 248
 26
-493
-222
+573
+372
 -1
 -1
 15.0
@@ -630,9 +777,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-10
+20
 0
-10
+20
 0
 0
 1
@@ -691,31 +838,191 @@ NIL
 1
 
 SLIDER
-21
-87
-193
-120
+20
+121
+192
+154
 world_size
 world_size
 10
 100
-10
+20
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-22
-141
-194
-174
+19
+173
+191
+206
 fov_percentage
 fov_percentage
 0
 50
 50
 1
+1
+NIL
+HORIZONTAL
+
+CHOOSER
+20
+311
+191
+356
+prey_movement
+prey_movement
+"RANDOM" "REACTIVE" "FLEE" "NAIVE"
+1
+
+CHOOSER
+24
+532
+195
+577
+gang_movement
+gang_movement
+"REACTIVE" "DELIBERATIVE" "LEARNING"
+0
+
+TEXTBOX
+1
+90
+208
+115
+         World Parameters
+15
+0.0
+1
+
+CHOOSER
+23
+465
+196
+510
+gang_legal_movement
+gang_legal_movement
+"DIAGONALS" "ORTHOGONAL" "HORIZONTALS" "VERTICALS"
+1
+
+TEXTBOX
+51
+277
+201
+296
+Prey Parameters
+15
+0.0
+1
+
+TEXTBOX
+38
+427
+188
+446
+Predators Parameters
+15
+0.0
+1
+
+TEXTBOX
+354
+421
+504
+440
+Learning Parameters
+15
+0.0
+1
+
+SLIDER
+232
+455
+404
+488
+discount_factor
+discount_factor
+0
+1
+0.13
+0.01
+1
+NIL
+HORIZONTAL
+
+SLIDER
+231
+498
+403
+531
+learning_rate
+learning_rate
+0
+1
+1
+0.1
+1
+NIL
+HORIZONTAL
+
+SLIDER
+231
+542
+403
+575
+reward_value
+reward_value
+0
+5
+5
+0.2
+1
+NIL
+HORIZONTAL
+
+SLIDER
+421
+541
+619
+574
+max_episodes
+max_episodes
+0
+1000
+50
+50
+1
+NIL
+HORIZONTAL
+
+SLIDER
+419
+453
+619
+486
+hit_wolf_reward
+hit_wolf_reward
+-1
+0
+0
+0.01
+1
+NIL
+HORIZONTAL
+
+SLIDER
+421
+496
+619
+529
+sheep_out_of_range_reward
+sheep_out_of_range_reward
+-1
+0
+0
+0.01
 1
 NIL
 HORIZONTAL
