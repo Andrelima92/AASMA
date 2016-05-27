@@ -291,21 +291,15 @@ to seek [ point ]
 
 end
 
-to-report zigZagWander[ point granularity ]
+to-report zigZagWander[ point ]
   let nextPoint point
   let aux 0
-
-
-;  if((first point) = 0)
-;  [
-;    set nextPoint (list (first nextPoint) ((last nextPoint) + 1))
-;  ]
 
   if(((last point) mod 2) = 0)[
 
     ifelse((first point) = world_size)
     [
-      set nextPoint (list (first point) ((last point) + 1))
+      set nextPoint (list (first point - 1) ((last point) + 1))
     ]
     [
       set nextPoint (list ((first point) + 1) (last point))
@@ -314,7 +308,7 @@ to-report zigZagWander[ point granularity ]
   if(((last point) mod 2) = 1)[
     ifelse((first point) = world_size)
     [
-      set nextPoint (list (first point) ((last point) + 1))
+      set nextPoint (list (first point + 1) ((last point) + 1))
     ]
     [
       set nextPoint (list ((first point) - 1) (last point))
@@ -322,7 +316,6 @@ to-report zigZagWander[ point granularity ]
   ]
 
   report nextPoint
-
 
 end
 ;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -350,12 +343,8 @@ end
 
    let solution find-path (list xcor ycor) ( list preyX preyY )
 
-   seek  (zigZagWander (list xcor ycor) 6 )
-
-
-
-
-
+   ;seek  zigZagWander (list xcor ycor)
+   seek  (list preyX preyY) ; so pros lols ;)
 
  end
 
