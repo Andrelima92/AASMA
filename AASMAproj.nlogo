@@ -171,8 +171,6 @@ to-report adjacent-positions-of-type [pos ttype]
 
   set solution []
 
-  print "current exploring node:"
-  print pos
 
 
   set solution fput (list x ((y - 1) mod (world_size + 1))) solution
@@ -273,6 +271,60 @@ to-report find-path [intialPos FinalPos]
 end
 
 
+to seek [ point ]
+
+  let nextDirX ((first point) - xcor)
+  let nextDirY ((last point) - ycor)
+
+  if(nextDirX > 0)[
+    move-ahead
+  ]
+  if(nextDirX < 0)[
+    move-back
+  ]
+  if(nextDirY > 0)[
+    move-up
+  ]
+  if(nextDirY < 0)[
+    move-down
+  ]
+
+end
+
+to-report zigZagWander[ point granularity ]
+  let nextPoint point
+  let aux 0
+
+
+;  if((first point) = 0)
+;  [
+;    set nextPoint (list (first nextPoint) ((last nextPoint) + 1))
+;  ]
+
+  if(((last point) mod 2) = 0)[
+
+    ifelse((first point) = world_size)
+    [
+      set nextPoint (list (first point) ((last point) + 1))
+    ]
+    [
+      set nextPoint (list ((first point) + 1) (last point))
+    ]
+  ]
+  if(((last point) mod 2) = 1)[
+    ifelse((first point) = world_size)
+    [
+      set nextPoint (list (first point) ((last point) + 1))
+    ]
+    [
+      set nextPoint (list ((first point) - 1) (last point))
+    ]
+  ]
+
+  report nextPoint
+
+
+end
 ;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
 ;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -287,8 +339,6 @@ end
 
 
  to wolf-deliberative-loop
-;  let a 0
-;  set a choose-dir
 
    let preyX 0
    let preyY 0
@@ -296,19 +346,15 @@ end
    ask preys [
     set preyX posX
     set preyY posY
-
    ]
 
    let solution find-path (list xcor ycor) ( list preyX preyY )
 
+   seek  (zigZagWander (list xcor ycor) 6 )
 
 
-  let walkLimit world_size / 6
-  let walked 0
-  if(walked < walkLimit)
-  [
-    move-ahead
-  ]
+
+
 
 
  end
@@ -483,6 +529,7 @@ to move-ahead
     set xcor next-x
     set ycor next-y
   ]
+  set heading 90
 end
 
 to move-back
@@ -492,6 +539,7 @@ to move-back
     set xcor next-x
     set ycor next-y
   ]
+  set heading 270
 end
 
 to move-up
@@ -501,6 +549,7 @@ to move-up
     set xcor next-x
     set ycor next-y
   ]
+  set heading 0
 end
 
 to move-down
@@ -510,6 +559,7 @@ to move-down
     set xcor next-x
     set ycor next-y
   ]
+  set heading 180
 end
 
 
@@ -564,7 +614,7 @@ GRAPHICS-WINDOW
 248
 26
 493
-252
+222
 -1
 -1
 15.0
@@ -578,9 +628,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-12
+10
 0
-12
+10
 0
 0
 1
@@ -647,7 +697,7 @@ world_size
 world_size
 10
 100
-12
+10
 1
 1
 NIL
