@@ -34,7 +34,8 @@ breed [preys prey]
 ;;; total-reward: cumulative reward so far
 ;;; init_xcor: initial xcor for reset
 ;;; init_ycor
-wolves-own[fov wolves_plan Q-values reward total-reward init_xcor init_ycor previous-xcor previous-ycor]
+wolves-own[fov wolves_plan told_plan Q-values reward total-reward init_xcor init_ycor previous-xcor previous-ycor]
+preys-own [fov init_xcor inity_cor]
 ;;;
 ;;;
 
@@ -92,6 +93,7 @@ create-wolves 4[
   set label who
   set fov floor (world_size * (fov_percentage / 100))
   set wolves_plan [-1 -1 -1 -1]
+  set told_plan [false false false false]
   set label-color black
   set size .9
   set-random-position
@@ -135,9 +137,6 @@ to reset
   ;; of the procedure.)
   ;;__clear-all-and-reset-ticks
   ask wolves[
-    set-current-plot "Reward performance"
-    set-current-plot-pen (word who "reward")
-      plot total-reward
       set total-reward 0
 
       ;resetar posições
@@ -147,9 +146,6 @@ to reset
       set previous-ycor ycor
     ]
 
-      set-current-plot "Time perfomance"
-      set-current-plot-pen "time-steps"
-      plot time-steps
       set episode-count (episode-count + 1)
       set time-steps 0
 
@@ -162,18 +158,14 @@ end
 to go
   tick
 
-ifelse episode-finished? [
-    reset
-    if episode-count >= max-episodes [stop]
-]
-  [
+
     ask preys[
     prey-loop
   ]
   ask wolves[
     wolf-loop
   ]
-  ]
+
 
 end
 
@@ -181,7 +173,7 @@ to wolf-loop
 
     ifelse(gang_movement = "REACTIVE")
     [
-      reactive-loop
+      wolf-reactive-loop
     ]
     [
     ifelse(gang_movement = "DELIBERATIVE")
@@ -189,10 +181,16 @@ to wolf-loop
       deliberative-loop
     ]
     [
-      ifelse( gang_movement = "LEARNING")
-      [
+    ifelse( gang_movement = "LEARNING")
+    [
+    ifelse episode-finished? [
+    reset
+    if episode-count >= max-episodes [stop]
+    ]
+    [
          wolf-learning-loop
     set total-time-steps (total-time-steps + 1)
+    ]
     ]
       [
     ]
@@ -448,6 +446,18 @@ to-report zigZagWander[ point ]
   report nextPoint
 
 end
+
+to-report getFirstNode [initialPos finalPos]
+  let path find-path initialPos finalPos
+
+  ifelse empty? path
+  [
+    report finalPos
+  ]
+  [
+    report first path
+  ]
+end
 ;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
 ;;;------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -476,76 +486,150 @@ to wolf-learning-loop
 end
 
 
- to deliberative-loop
+  to deliberative-loop
 
    let preyX 0
    let preyY 0
+   let myX xcor
+   let myY ycor
+   let myPlan item label wolves_plan
+   let startingPos list myX myY
+
 
    ask preys [
     set preyX posX
     set preyY posY
    ]
 
-   let solution find-path (list xcor ycor) ( list preyX preyY )
+   ifelse myPlan != -1
+   [
+     ;Test if all wolves in range have been sent my plan
+     let allInRangeReceived true
+     let sentMessage told_plan
+       ask wolves [
+         if in-range-pos myX myY and not item label sentMessage
+         [
+           set allInRangeReceived false
+           set sentMessage replace-item label sentMessage true
+         ]
+       ]
+     set told_plan sentMessage ;Is this necessary?
 
-   ;seek  zigZagWander (list xcor ycor)
-   seek  (list preyX preyY) ; so pros lols ;)
+     ;If every wolf I see knows what my plan is
+     ifelse allInRangeReceived
+     [
+       ;If I see the target, go after it
+       ifelse in-range-pos preyX preyY
+       [
+         let targetPos list getPlanPointX preyX myPlan getPlanPointY preyY myPlan
+         seek  (getFirstNode startingPos targetPos)
+       ]
+       ;Else, cover the map in zig-zag
+       [
+         seek  zigZagWander (list xcor ycor)
+       ]
+     ]
+     ;Else send message to all in range so they know my plan
+     [
+       pass-message myPlan
+     ]
+   ]
+   [
+     ;If I see the target, create plan
+       ifelse in-range-pos preyX preyY
+       [
+         let chosen_dir choose-dir
+         set wolves_plan replace-item label wolves_plan chosen_dir
+
+         let targetPos list getPlanPointX preyX chosen_dir getPlanPointY preyY chosen_dir
+
+         seek  (getFirstNode startingPos targetPos)
+       ]
+       ;Else, cover the map in zig-zag
+       [
+         ;If I have an idea of the last known location
+         seek  zigZagWander (list xcor ycor)
+       ]
+   ]
 
  end
 
- to reactive-loop
-   ifelse  in-sight[
-     let preyX 0
-     let preyY 0
-     let corner 0
-
-     ask preys [
-      set preyX posX
-      set preyY posY
-      ifelse in-corner
-      [ set corner 1]
-      [set corner 0]
-
-     ]
-     ifelse corner = 1
-     [
-       ifelse preyX < xcor[
-          move-ahead
-     ]
-      [
-        ifelse preyY < ycor[
-        move-up
-        ]
-        [
-          ifelse preyX > xcor[
-            move-back
-          ]
-          [
-            move-down
-          ]
-          ]
-        ]
-      ]
-
-     [
-       ifelse preyX > xcor[
-          move-ahead
-     ]
-      [
-        ifelse preyY > ycor[
-        move-up
-        ]
-        [
-          ifelse preyX < xcor[
-            move-back
-          ]
-          [
-            move-down
-          ]
-          ]
-        ]
-     ]
+ to wolf-reactive-loop
+   let preyX 0
+   let preyY 0
+   ask preys [
+     set preyX posx
+     set preyY posY
    ]
+
+   ifelse in-range-pos preyX preyY[
+
+     let dist distanceVector preyX preyY
+
+     let distX item 0 dist
+     let distY item 1 dist
+
+
+     ;Do tiebreak
+     if abs distX = abs distY
+     [
+       let i random 2
+
+       if i = 0
+       [
+         if distX > 0
+         [
+           move-ahead
+         ]
+
+         if distX < 0
+         [
+           move-back
+         ]
+       ]
+       if i = 1
+       [
+         if distY > 0
+         [
+           move-up
+         ]
+
+         if distY < 0
+         [
+           move-down
+         ]
+
+       ]
+     ]
+
+     if abs distX > abs distY
+     [
+       if distX > 0
+       [
+         move-ahead
+       ]
+
+       if distX < 0
+       [
+         move-back
+       ]
+     ]
+
+     if abs distY > abs distX
+     [
+       if distY > 0
+       [
+         move-up
+       ]
+
+       if distY < 0
+       [
+         move-down
+       ]
+     ]
+
+   ]
+
    [
      let i random 4
      if i = 0 [
@@ -575,7 +659,7 @@ to prey-loop
   [
   ifelse(prey_movement = "REACTIVE")
   [
-    reactive-loop
+    ;prey-reactive-loop
   ]
   [
    ifelse(prey_movement = "FLEE")
@@ -642,28 +726,6 @@ end
 ;;;   Sensors
 ;;; ------------------------
 ;;;
-to-report in-sight
-    let preyX 0
-     let preyY 0
-     ask preys [
-       set preyX posx
-       set preyY posY
-     ]
-  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
-end
-
-to-report in-corner
-  let preyX 0
-     let preyY 0
-     ask preys [
-       set preyX posx
-       set preyY posY
-     ]
-  report (((preyX = 0) and ( preyY = 0)) or
-         ((preyX = 0) and ( preyY = world_size)) or
-         ((preyX = world_size) and (preyY = 0)) or
-         ((preyX = world_size) and (preyY = world_size)))
-end
 
 to-report choose-dir
      let preyX 0
@@ -836,20 +898,72 @@ end
  end
 
 to-report in-range-pos [x y]
-  report max ( list ((x  - xcor ) mod (world_size + 1))  (( y - ycor ) mod (world_size + 1))  ) < fov
+  report distance-to-pos x y <= fov
 end
+
 to-report distance-to-pos [x y]
-    report max ( list ((x  - xcor ) mod (world_size + 1))  (( y - ycor ) mod (world_size + 1))  )
+ let vector distanceVector x y
+
+ report max list abs (item 0 vector) abs (item 1 vector)
+end
+
+
+to-report distanceVector [x y]
+
+  let aroundVectorX min (list x xcor) + (world_size + 1) - max (list x xcor)
+  if min (list x xcor) = xcor
+  [
+    set aroundVectorX -1 * aroundVectorX
+  ]
+
+  let aroundVectorY min (list y ycor) + (world_size + 1) - max (list y ycor)
+  if min (list y ycor) = ycor
+  [
+    set aroundVectorY -1 * aroundVectorY
+  ]
+
+
+  let normalVectorX x - xcor
+  let normalVectorY y - ycor
+
+  let finalVectorX 0
+  let finalVectorY 0
+
+  ifelse(abs(normalVectorX) > abs(aroundVectorX))
+  [
+    set finalVectorX aroundVectorX
+  ]
+  [
+    set finalVectorX normalVectorX
+  ]
+
+  ifelse(abs(normalVectorY) > abs(aroundVectorY))
+  [
+    set finalVectorY aroundVectorY
+  ]
+  [
+    set finalVectorY normalVectorY
+  ]
+
+  report list finalVectorX finalVectorY
+
 end
 
 to send-message-to-wolf [id-wolf msg myId]
   ask turtle id-wolf [receive-message msg myId]
 end
 
-to receive-message [ sender msg ]
+to receive-message [ msg sender ]
   set wolves_plan replace-item sender wolves_plan msg
-end
 
+
+  ;if wolf that sent message has same plan as me, replan
+  if msg = item label wolves_plan and sender != label
+  [
+    set wolves_plan replace-item label wolves_plan -1
+    set told_plan [false false false false]
+  ]
+end
 
 to pass-message [dir]
  let myId label
@@ -859,6 +973,24 @@ to pass-message [dir]
    if in-range-pos myX myY
        [ send-message-to-wolf label dir myId]
  ]
+ end
+
+
+ to-report getPlanPointX [preyX plan]
+
+   let additions [-1 1 0 0]
+   let out (preyX + item plan additions) mod (world_size + 1)
+
+   report out
+ end
+
+ to-report getPlanPointY [preyY plan]
+
+   let additions [0 0 1 -1]
+
+   let out (preyY + item plan additions)  mod (world_size + 1)
+
+   report out
  end
 
 to-report get-reward [action]
@@ -1007,8 +1139,8 @@ end
 GRAPHICS-WINDOW
 248
 26
-573
-372
+648
+447
 -1
 -1
 15.0
@@ -1022,9 +1154,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-20
+25
 0
-20
+25
 0
 0
 1
@@ -1032,10 +1164,10 @@ ticks
 30.0
 
 BUTTON
-12
-27
-77
-60
+125
+23
+190
+56
 NIL
 Reset
 NIL
@@ -1049,10 +1181,10 @@ NIL
 1
 
 BUTTON
-148
-27
-211
-60
+126
+67
+189
+100
 go
 go
 T
@@ -1066,10 +1198,10 @@ NIL
 1
 
 BUTTON
-81
-27
-144
-60
+44
+67
+107
+100
 step
 tick
 NIL
@@ -1083,25 +1215,25 @@ NIL
 1
 
 SLIDER
-20
-121
-192
-154
+28
+145
+200
+178
 world_size
 world_size
 10
 100
-20
+25
 1
 1
 NIL
 HORIZONTAL
 
 SLIDER
-19
-173
-191
-206
+28
+187
+200
+220
 fov_percentage
 fov_percentage
 0
@@ -1113,80 +1245,80 @@ NIL
 HORIZONTAL
 
 CHOOSER
-20
-311
-191
-356
+28
+263
+199
+308
 prey_movement
 prey_movement
 "RANDOM" "REACTIVE" "FLEE" "NAIVE"
-1
+0
 
 CHOOSER
-24
-532
-195
-577
+27
+418
+198
+463
 gang_movement
 gang_movement
 "REACTIVE" "DELIBERATIVE" "LEARNING"
-0
+1
 
 TEXTBOX
-1
-90
-208
-115
+4
+117
+211
+142
          World Parameters
 15
 0.0
 1
 
 CHOOSER
-23
-465
-196
-510
+26
+358
+199
+403
 gang_legal_movement
 gang_legal_movement
 "DIAGONALS" "ORTHOGONAL" "HORIZONTALS" "VERTICALS"
 1
 
 TEXTBOX
-51
-277
-201
-296
+54
+236
+204
+255
 Prey Parameters
 15
 0.0
 1
 
 TEXTBOX
-38
-427
-188
-446
+42
+331
+192
+350
 Predators Parameters
 15
 0.0
 1
 
 TEXTBOX
-354
-421
-504
-440
+43
+484
+193
+503
 Learning Parameters
 15
 0.0
 1
 
 SLIDER
-232
-455
-404
-488
+27
+516
+199
+549
 discount-factor
 discount-factor
 0
@@ -1198,10 +1330,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-231
-498
-403
-531
+27
+561
+199
+594
 learning-rate
 learning-rate
 0
@@ -1213,10 +1345,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-231
-542
-403
-575
+25
+608
+197
+641
 reward-value
 reward-value
 0
@@ -1228,10 +1360,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-421
-541
-619
-574
+15
+748
+213
+781
 max-episodes
 max-episodes
 0
@@ -1243,10 +1375,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-419
-453
-619
-486
+14
+654
+214
+687
 hit-wolf-reward
 hit-wolf-reward
 -1
@@ -1258,25 +1390,25 @@ NIL
 HORIZONTAL
 
 SLIDER
-421
-496
-619
-529
+14
+701
+212
+734
 sheep-out-of-range-reward
 sheep-out-of-range-reward
 -1
 0
-0
+-0.01
 0.01
 1
 NIL
 HORIZONTAL
 
 BUTTON
-188
-76
-254
+43
+22
 109
+55
 Setup
 Setup
 NIL
