@@ -56,6 +56,7 @@ create-wolves 4[
   set wolves_plan [-1 -1 -1 -1]
   set label-color black
   set size .9
+  set heading 0
   set-random-position
 ]
 ; change colors of 2 3 and 4
@@ -69,6 +70,7 @@ create-preys 1[
   set label who
   set label-color black
   set size .9
+  set heading 0
   set-random-position
 ]
 end
@@ -171,8 +173,6 @@ to-report adjacent-positions-of-type [pos ttype]
 
   set solution []
 
-
-
   set solution fput (list x ((y - 1) mod (world_size + 1))) solution
 
   set solution fput (list x ((y + 1) mod (world_size + 1))) solution
@@ -181,9 +181,6 @@ to-report adjacent-positions-of-type [pos ttype]
 
   set solution fput (list ((x + 1) mod (world_size + 1)) y) solution
 
-;  foreach solution
-;  [ if not (read-map-position ? = (word "" ttype))
-;    [ set solution remove ? solution ] ]
   report solution
 end
 
@@ -233,7 +230,16 @@ to-report find-path [intialPos FinalPos]
 
     ifelse last first to-explore = FinalPos
     [
-      report find-solution to-explore closed
+
+        let solution find-solution to-explore closed
+        foreach solution
+        [
+          if(not(legal-move? (first ?) (last ?) ))
+          [
+            set solution remove ? solution
+          ]
+        ]
+      report solution
     ]
     [
 
@@ -295,7 +301,14 @@ to-report zigZagWander[ point ]
   let nextPoint point
   let aux 0
 
-  if(((last point) mod 2) = 0)[
+  let range round (2 * fov + 1)
+
+  if(range <= 3 )
+  [
+     set range 4
+  ]
+
+  if(((last point) mod range) > (range / 2))[
 
     ifelse((first point) = world_size)
     [
@@ -305,7 +318,7 @@ to-report zigZagWander[ point ]
       set nextPoint (list ((first point) + 1) (last point))
     ]
   ]
-  if(((last point) mod 2) = 1)[
+  if(((last point) mod range) <= (range / 2))[
     ifelse((first point) = world_size)
     [
       set nextPoint (list (first point + 1) ((last point) + 1))
@@ -453,7 +466,7 @@ to-report in-sight
        set preyX posx
        set preyY posY
      ]
-  report max ( list abs ( preyX - xcor )  abs ( preyY - ycor )  ) < fov
+  report abs sqrt ( (preyX - xcor)*(preyX - xcor) + (preyY - ycor) * (preyY - ycor)) < fov
 end
 
 to-report in-corner
@@ -574,10 +587,10 @@ end
  end
 
 to-report in-range-pos [x y]
-  report max ( list abs (x  - xcor )  abs ( y - ycor )  ) < fov
+  report max ( list ((x  - xcor ) mod (world_size + 1))  (( y - ycor ) mod (world_size + 1))  ) < fov
 end
 to-report distance-to-pos [x y]
-    report max ( list abs (x  - xcor )  abs ( y - ycor )  )
+    report max ( list ((x  - xcor ) mod (world_size + 1))  (( y - ycor ) mod (world_size + 1))  )
 end
 
 to send-message-to-wolf [id-wolf msg myId]
@@ -693,10 +706,10 @@ NIL
 HORIZONTAL
 
 SLIDER
-20
-142
-192
-175
+22
+141
+194
+174
 fov_percentage
 fov_percentage
 0
