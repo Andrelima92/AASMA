@@ -1,7 +1,15 @@
 ;;;
 ;;;  Global variables and constants
+extensions [array]
 ;;;
-globals [worldX worldY UNKNOWN ROOM_FLOOR WOLF_TYPE PREY_TYPE]
+;;; NUM-ACTIONS: number of actions considered
+;;; epsilon: decay probability of learning reward value decreases over time.
+;;; temperature: parameter influencing action selection in soft-max
+;;; time-steps: number of time-steps in the current episode.
+;;; episode-count: total number of episodes
+
+globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count total-time-steps]
+
 
 ;;;
 ;;;  Declare two types of turtles
@@ -11,28 +19,58 @@ breed [wolves wolf]
 breed [preys prey]
 
 ;;;
-;;;  Declare cells' properties
 ;;;
-patches-own [kind shelf-color]
+;;;Wolves internal states:
+;;;
+;;;fov: field of view
+;;;wolves_plan: each wolf has a list of his and the other wolves path plan:
+;;; possible plans are 0 - approach left
+;;; 1- approach right
+;;; 2- approach from above
+;;; 3- approach from down
+;;;
+;;; Q-values: Q-value function updated by Q-learning in the form (x y action) -> value
+;;; reward: current reward number
+;;; total-reward: cumulative reward so far
+;;; init_xcor: initial xcor for reset
+;;; init_ycor
+wolves-own[fov wolves_plan Q-values reward total-reward init_xcor init_ycor previous-xcor previous-ycor]
+;;;
+;;;
 
-wolves-own[fov wolves_plan]
-preys-own [fov init_xcor init_ycor]
+;;;  =================================================================
+;;;      Interface reports
+;;;  =================================================================
+to-report get-total-time-steps
+  report total-time-steps
+end
 
-;;;
-;;;  Reset the simulation
-;;;
-to reset
-  ;; (for this model to work with NetLogo's new plotting features,
-  ;; __clear-all-and-reset-ticks should be replaced with clear-all at
-  ;; the beginning of your setup procedure and reset-ticks at the end
-  ;; of the procedure.)
-  ;;__clear-all-and-reset-ticks
+to-report get-episode-count
+  report episode-count
+end
+;;;  =================================================================
+;;;      Setup
+;;;  =================================================================
+to setup
   clear-all
-  reset-ticks
-  ;set-globals
+  set-globals
   setup-patches
   setup-turtles
+  reset-ticks
+end
 
+to set-globals
+  set time-steps 0
+  set epsilon 1
+  set temperature 100
+
+  set ACTION-LIST (list
+    list 0 1 ; go up (north)
+    list 0 -1 ; go down (south)
+    list 1 0 ; move ahead
+    list -1 0 ; move back
+    )
+  set NUM-ACTIONS 4
 end
 
 ;;;  Setup patches.
@@ -56,8 +94,14 @@ create-wolves 4[
   set wolves_plan [-1 -1 -1 -1]
   set label-color black
   set size .9
-  set heading 0
   set-random-position
+  set init_xcor xcor
+  set init_ycor ycor
+  set previous-xcor (xcor + max-pxcor)
+  set previous-ycor (ycor + max-pycor)
+  set Q-values get-initial-Q-values
+  set reward 0
+  set total-reward 0
 ]
 ; change colors of 2 3 and 4
 
@@ -84,15 +128,51 @@ to set-random-position
   ]
 end
 
+to reset
+  ;; (for this model to work with NetLogo's new plotting features,
+  ;; __clear-all-and-reset-ticks should be replaced with clear-all at
+  ;; the beginning of your setup procedure and reset-ticks at the end
+  ;; of the procedure.)
+  ;;__clear-all-and-reset-ticks
+  ask wolves[
+    set-current-plot "Reward performance"
+    set-current-plot-pen (word who "reward")
+      plot total-reward
+      set total-reward 0
+
+      ;resetar posições
+      set xcor init_xcor
+      set ycor init_ycor
+      set previous-xcor xcor
+      set previous-ycor ycor
+    ]
+
+      set-current-plot "Time perfomance"
+      set-current-plot-pen "time-steps"
+      plot time-steps
+      set episode-count (episode-count + 1)
+      set time-steps 0
+
+      set epsilon max list 0 (1 - (episode-count / max-episodes))
+      set temperature max list 0.8 (epsilon * 10)
+
+
+end
 
 to go
   tick
 
-  ask preys[
+ifelse episode-finished? [
+    reset
+    if episode-count >= max-episodes [stop]
+]
+  [
+    ask preys[
     prey-loop
   ]
   ask wolves[
     wolf-loop
+  ]
   ]
 
 end
@@ -109,8 +189,16 @@ to wolf-loop
       deliberative-loop
     ]
     [
+      ifelse( gang_movement = "LEARNING")
+      [
+         wolf-learning-loop
+    set total-time-steps (total-time-steps + 1)
+    ]
+      [
     ]
     ]
+    ]
+
 end
 
 
@@ -137,7 +225,7 @@ to-report adjacents [node mobjectivo]
   let aux2 0
 
   set aux2 []
-  set aux adjacent-positions-of-type (last first node) ROOM_FLOOR
+  set aux adjacent-positions-of-type (last first node)
 
   foreach aux
   [
@@ -174,7 +262,7 @@ end
 
 
 
-to-report adjacent-positions-of-type [pos ttype]
+to-report adjacent-positions-of-type [pos ]
   let solution 0
   let x item 0 pos
   let y item 1 pos
@@ -372,6 +460,21 @@ end
 ;;; ------------------------
 ;;;
 
+to wolf-learning-loop
+  let action select-action xcor ycor
+
+  ;executes action
+  execute-action action
+
+  ; gets reward
+  set reward get-reward action
+  set total-reward (total-reward + reward)
+
+  ;updates Q-value function Q-value function
+
+  update-Q-value action
+end
+
 
  to deliberative-loop
 
@@ -391,7 +494,6 @@ end
  end
 
  to reactive-loop
-
    ifelse  in-sight[
      let preyX 0
      let preyY 0
@@ -758,6 +860,149 @@ to pass-message [dir]
        [ send-message-to-wolf label dir myId]
  ]
  end
+
+to-report get-reward [action]
+  let next-x xcor + first action
+  let next-y ycor + last action
+  let preyX 0
+  let preyY 0
+   ask preys[
+     set preyX xcor
+     set preyY ycor
+   ]
+   ifelse (next-x = preyX) and (next-y = preyY)
+   [ report reward-value ]
+   []
+   end; did it hit a wolf
+
+
+
+
+to-report episode-finished?
+  let end? 1
+  let right? 0
+  let left? 0
+  let up? 0
+  let down? 0
+  let preyX 0
+  let preyY 0
+  ask preys[
+    set preyX xcor
+    set preyY ycor
+  ]
+
+  ask wolves [
+  if (xcor = preyX + 1) and (ycor = preyY)
+      [ set right? 1]
+  if (xcor = preyX - 1) and (ycor = preyY)
+      [set left? 1]
+  if ( xcor = preyX) and (ycor = preyY + 1)
+      [ set up? 1]
+  if (xcor = preyX) and (ycor = preyY - 1)
+      [set down? 1]
+  ]
+  report (left? = 1) and (right? = 1) and (up? = 1) and (down? = 1)
+end
+
+ to-report get-max-Q-value[x y]
+   report max array:to-list get-Q-values x y
+ end
+
+ to set-Q-value [x y action value]
+   array:set (get-Q-values x y) (get-action-index action) value
+ end
+
+ to-report get-Q-values [x y]
+   report array:item (array:item Q-values x) y
+ end
+
+ to-report get-Q-value [x y action]
+   let action-values get-Q-values x y
+   report array:item action-values (get-action-index action)
+ end
+
+ to-report get-action-index [action]
+   report position action ACTION-LIST
+ end
+
+ to-report get-initial-Q-values
+   report array:from-list n-values world-width[
+     array:from-list n-values world-height[
+       array:from-list n-values NUM-ACTIONS[0]]]
+ end
+;;;
+;;; ------------------------
+;;;   Learning
+;;; ------------------------
+;;;
+to execute-action [action]
+   ;save previous position
+   set previous-xcor xcor
+   set previous-ycor ycor
+
+   ;saves new position if  action goes to a legal state
+
+   let next-x xcor + first action
+   let next-y ycor + last action
+
+   if legal-move? next-x next-y
+   [
+     set xcor next-x
+     set ycor next-y
+   ]
+
+   set time-steps (time-steps + 1)
+ end
+
+
+to-report select-action [x y]
+  report select-action-soft-max x y
+
+ end
+
+to update-Q-value [action]
+  update-Q-learning action
+end
+
+;;;
+;;;  Chooses an action according to the soft-max method.
+;;;
+;;;
+
+to-report select-action-soft-max [x y]
+
+  ; gets action probs
+  let action-values array:to-list (get-Q-values x y)
+  let action-probs map [ ( exp (? / temperature)) ] action-values
+  let sum-q sum action-probs
+  set action-probs map [? / sum-q ] action-probs
+
+  ;choses random action
+  let dice random-float 1
+  let prob-sum item 0 action-probs
+  let action-index 0
+  while [ prob-sum < dice]
+  [
+    set action-index ( action-index + 1)
+    set prob-sum ( prob-sum + (item action-index action-probs))
+  ]
+  report item action-index ACTION-LIST
+end
+
+to update-Q-learning [action]
+  ;get previous Q-value
+  let previous-Q-value (get-Q-value previous-xcor previous-ycor action)
+
+  ; get funny math expression
+  let prediction-error (reward + ( discount-factor * get-max-Q-value xcor ycor) - previous-Q-value)
+
+; get funny math part 2
+  let new-Q-value (previous-Q-value + ( learning-rate * prediction-error))
+
+
+ ;sets new Q-value
+ set-Q-value previous-xcor previous-ycor action new-Q-value
+end
 @#$#@#$#@
 GRAPHICS-WINDOW
 248
@@ -942,8 +1187,8 @@ SLIDER
 455
 404
 488
-discount_factor
-discount_factor
+discount-factor
+discount-factor
 0
 1
 0.13
@@ -957,8 +1202,8 @@ SLIDER
 498
 403
 531
-learning_rate
-learning_rate
+learning-rate
+learning-rate
 0
 1
 1
@@ -972,8 +1217,8 @@ SLIDER
 542
 403
 575
-reward_value
-reward_value
+reward-value
+reward-value
 0
 5
 5
@@ -987,8 +1232,8 @@ SLIDER
 541
 619
 574
-max_episodes
-max_episodes
+max-episodes
+max-episodes
 0
 1000
 50
@@ -1002,8 +1247,8 @@ SLIDER
 453
 619
 486
-hit_wolf_reward
-hit_wolf_reward
+hit-wolf-reward
+hit-wolf-reward
 -1
 0
 0
@@ -1017,8 +1262,8 @@ SLIDER
 496
 619
 529
-sheep_out_of_range_reward
-sheep_out_of_range_reward
+sheep-out-of-range-reward
+sheep-out-of-range-reward
 -1
 0
 0
@@ -1026,6 +1271,23 @@ sheep_out_of_range_reward
 1
 NIL
 HORIZONTAL
+
+BUTTON
+188
+76
+254
+109
+Setup
+Setup
+NIL
+1
+T
+OBSERVER
+NIL
+NIL
+NIL
+NIL
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
