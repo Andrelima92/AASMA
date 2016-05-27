@@ -993,20 +993,40 @@ to pass-message [dir]
    report out
  end
 
+
 to-report get-reward [action]
   let next-x xcor + first action
   let next-y ycor + last action
   let preyX 0
   let preyY 0
+  let crash 0
    ask preys[
      set preyX xcor
      set preyY ycor
    ]
-   ifelse (next-x = preyX) and (next-y = preyY)
-   [ report reward-value ]
-   []
-   end; did it hit a wolf
+   ;hits prey
 
+   if (next-x = preyX) and (next-y = preyY)
+      [
+        report reward-value
+         ]
+  ask wolves [
+    ;hits wolf
+     if ( next-x = xcor) and (next-y = ycor)
+       [
+          set crash 1
+          ]
+   ]
+       ;out of sheep's range
+      if not in-range-pos preyX preyY
+         [
+           report sheep-out-of-range-reward
+           ]
+      ifelse crash = 1
+      [report hit-wolf-reward]
+     [report 0]
+
+   end; did it hit a wolf
 
 
 
@@ -1139,8 +1159,8 @@ end
 GRAPHICS-WINDOW
 248
 26
-648
-447
+493
+222
 -1
 -1
 15.0
@@ -1154,9 +1174,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-25
+10
 0
-25
+10
 0
 0
 1
@@ -1223,7 +1243,7 @@ world_size
 world_size
 10
 100
-25
+10
 1
 1
 NIL
@@ -1252,7 +1272,7 @@ CHOOSER
 prey_movement
 prey_movement
 "RANDOM" "REACTIVE" "FLEE" "NAIVE"
-0
+2
 
 CHOOSER
 27
@@ -1262,7 +1282,7 @@ CHOOSER
 gang_movement
 gang_movement
 "REACTIVE" "DELIBERATIVE" "LEARNING"
-1
+2
 
 TEXTBOX
 4
