@@ -8,7 +8,7 @@ extensions [array]
 ;;; time-steps: number of time-steps in the current episode.
 ;;; episode-count: total number of episodes
 
-globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count ole-count]
+globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count preys-killed n-collisions messages-sent]
 ;;;
 ;;;  Declare two types of turtles
 ;;;
@@ -60,6 +60,9 @@ to setup
 end
 
 to set-globals
+  set n-collisions 0
+  set preys-killed 0
+  set messages-sent 0
   set time-steps 0
   set epsilon 1
   set temperature 100
@@ -147,10 +150,6 @@ to reset
     set-current-plot-pen (word who "reward")
     plot total-reward
 
-
-
-    print "total-reward"
-    print total-reward
     set total-reward 0
 
 
@@ -181,48 +180,107 @@ to go
   if episode-finished? [
     reset
     if episode-count >= max-episodes [
-      show ole-count
       stop
       ]
     ]
 
-    ask preys[
-    prey-loop
+  let preyMove []
+  let wolvesMoves [[][][][]]
+
+  ask preys[
+    set preyMove prey-loop
+
   ]
   ask wolves[
-    wolf-loop
+    set wolvesMoves replace-item label wolvesMoves wolf-loop
   ]
 
+
+  ;Finally Move
+  ask preys[
+    if not empty? preyMove
+    [
+
+      let repeatNumber length filter [? = preyMove] wolvesMoves
+
+      ifelse repeatNumber > 0
+      [
+        set n-collisions (n-collisions + 1 / (repeatNumber + 1))
+      ]
+      [
+        if legal-move? first preyMove last preyMove
+        [
+          set xcor first preyMove
+          set ycor last preyMove
+        ]
+      ]
+    ]
+  ]
+
+  ask wolves [
+    let myMove item label wolvesMoves
+
+    if not empty? wolvesMoves [
+
+      let repeatNumber (length filter [? = myMove] wolvesMoves) - 1
+      if preyMove = myMove
+      [
+        set repeatNumber (repeatNumber + 1)
+      ]
+
+      ifelse repeatNumber > 0
+      [
+        set n-collisions (n-collisions + 1 / (repeatNumber + 1))
+      ]
+      [
+        if not empty? myMove and legal-move? first myMove last myMove
+        [
+          set xcor first myMove
+          set ycor last myMove
+        ]
+      ]
+    ]
+  ]
+
+  set n-collisions round n-collisions
    set time-steps (time-steps + 1)
 
 end
 
-to wolf-loop
+to-report  prey-loop
+  let move []
 
-    ifelse(gang_movement = "REACTIVE")
-    [
-      wolf-reactive-loop
-    ]
-    [
-    ifelse(gang_movement = "DELIBERATIVE")
-    [
+  set move random-loop
 
+  report move
+end
 
+to-report wolf-loop
 
-      deliberative-loop
-    ]
-    [
-    ifelse( gang_movement = "LEARNING")
-    [
+  ifelse(gang_movement = "REACTIVE")
+  [
+    report wolf-reactive-loop
+  ]
+  [
+  ifelse(gang_movement = "DELIBERATIVE")
+  [
+    report deliberative-loop
+  ]
+  [
+  ifelse( gang_movement = "LEARNING")
+  [
 
-         wolf-learning-loop
-    ]
-    []
-    ]
-    ]
+    report wolf-learning-loop
+  ]
+  []
+  ]
+  ]
 
 
 end
+
+
+
 
 
 ;;;
@@ -401,44 +459,50 @@ to-report find-path [intialPos FinalPos]
 end
 
 
-to seek [ point ]
+to-report seek [ point ]
+  let move []
 
   let nextDirX ((first point) - xcor)
   let nextDirY ((last point) - ycor)
 
   if(nextDirX > 0)[
-    move-ahead
+    set move move-ahead
   ]
   if(nextDirX < 0)[
-    move-back
+    set move move-back
   ]
   if(nextDirY > 0)[
-    move-up
+    set move move-up
   ]
   if(nextDirY < 0)[
-    move-down
+    set move move-down
   ]
+
+  report move
 
 end
 
 
-to flee [ point ]
+to-report flee [ point ]
+  let move []
 
   let nextDirX ((first point) - xcor)
   let nextDirY ((last point) - ycor)
 
   if(nextDirX > 0)[
-    move-back
+    set move move-back
   ]
   if(nextDirX < 0)[
-    move-ahead
+    set move move-ahead
   ]
   if(nextDirY > 0)[
-    move-down
+    set move move-down
   ]
   if(nextDirY < 0)[
-    move-up
+    set move move-up
   ]
+
+  report move
 
 end
 
@@ -500,7 +564,9 @@ end
 ;;; ------------------------
 ;;;
 
-to wolf-learning-loop
+to-report wolf-learning-loop
+  let oldPos list xcor ycor
+
   let tuple select-action xcor ycor
 
   let action first tuple
@@ -508,6 +574,9 @@ to wolf-learning-loop
 
   ;executes action
   set qIndex execute-action action qIndex
+
+  let move list xcor ycor
+
   ; gets reward
   set reward get-reward action
   set total-reward (total-reward + reward)
@@ -515,10 +584,16 @@ to wolf-learning-loop
   ;updates Q-value function Q-value function
 
   update-Q-value action qIndex
+
+  ;just to work with all other moves, move back
+  set xcor first oldPos
+  set ycor last oldPos
+  report move
 end
 
 
-  to deliberative-loop
+  to-report deliberative-loop
+   let move []
 
    let preyX 0
    let preyY 0
@@ -554,16 +629,17 @@ end
        ifelse in-range-pos preyX preyY
        [
          let targetPos list getPlanPointX preyX myPlan getPlanPointY preyY myPlan
-         seek  (getFirstNode startingPos targetPos)
+         set move seek  (getFirstNode startingPos targetPos)
        ]
        ;Else, cover the map in zig-zag
        [
-         seek  zigZagWander (list xcor ycor)
+         set move seek  zigZagWander (list xcor ycor)
        ]
      ]
      ;Else send message to all in range so they know my plan
      [
        pass-message myPlan
+       set messages-sent (messages-sent + 1)
      ]
    ]
    [
@@ -575,18 +651,22 @@ end
 
          let targetPos list getPlanPointX preyX chosen_dir getPlanPointY preyY chosen_dir
 
-         seek  (getFirstNode startingPos targetPos)
+         set move seek  (getFirstNode startingPos targetPos)
        ]
        ;Else, cover the map in zig-zag
        [
          ;If I have an idea of the last known location
-         seek  zigZagWander (list xcor ycor)
+         set move seek  zigZagWander (list xcor ycor)
        ]
    ]
 
+   report move
+
  end
 
- to wolf-reactive-loop
+ to-report wolf-reactive-loop
+   let move []
+
    let preyX 0
    let preyY 0
    ask preys [
@@ -611,24 +691,24 @@ end
        [
          if distX > 0
          [
-           move-ahead
+           set move move-ahead
          ]
 
          if distX < 0
          [
-           move-back
+           set move move-back
          ]
        ]
        if i = 1
        [
          if distY > 0
          [
-           move-up
+           set move move-up
          ]
 
          if distY < 0
          [
-           move-down
+           set move move-down
          ]
 
        ]
@@ -638,12 +718,12 @@ end
      [
        if distX > 0
        [
-         move-ahead
+         set move move-ahead
        ]
 
        if distX < 0
        [
-         move-back
+         set move move-back
        ]
      ]
 
@@ -651,12 +731,12 @@ end
      [
        if distY > 0
        [
-         move-up
+         set move move-up
        ]
 
        if distY < 0
        [
-         move-down
+         set move move-down
        ]
      ]
 
@@ -665,57 +745,29 @@ end
    [
      let i random 4
      if i = 0 [
-    move-up
-              ]
-  if i = 1[
-    move-down
-        ]
-  if i = 2[
-    move-ahead
-       ]
-  if i = 3[
-    move-back
-      ]
+       set move move-up
+     ]
+     if i = 1[
+       set move move-down
+     ]
+     if i = 2[
+       set move move-ahead
+     ]
+     if i = 3[
+       set move move-back
+     ]
    ]
+
+   report move
 
  end
 
-
-
-
-to prey-loop
-  ifelse(prey_movement = "RANDOM")
-  [
-    random-loop
-  ]
-  [
-  ifelse(prey_movement = "REACTIVE")
-  [
-    ;prey-reactive-loop
-  ]
-  [
-   ifelse(prey_movement = "FLEE")
-  [
-    flee-loop
-  ]
-  [
-   ifelse(prey_movement = "NAIVE")
-  [
-    naive-loop
-  ]
-  [
-  ]]]]
+to-report naive-loop
+  report seek list (world_size / 2) (world_size / 2)
 end
 
 
-
-
-to naive-loop
-  seek list (world_size / 2) (world_size / 2)
-end
-
-
-to flee-loop
+to-report flee-loop
   let averageX 0
   let averageY 0
   let counter 0;
@@ -731,24 +783,28 @@ to flee-loop
   let distanceX (averageX)
   let distanceY (averageY)
 
-  flee list distanceX distanceY
+  report flee list distanceX distanceY
 
 end
 
-to random-loop
+to-report random-loop
+  let move []
+
   let i random 5
   if i = 0 [
-    move-up
+    set move move-up
   ]
   if i = 1[
-    move-down
+    set move move-down
   ]
   if i = 2[
-    move-ahead
+    set move move-ahead
   ]
   if i = 3[
-    move-back
+    set move move-back
   ]
+
+  report move
 end
 
 
@@ -801,110 +857,78 @@ end
 ;;; ------------------------
 ;;;
 
-to move-diag-tl
-  if(gang_legal_movement = "DIAGONALS")
-  [
+to-report move-diag-tl
+  let move []
     let next-x xcor + 1
     let next-y ycor + 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 45
-  ]
+  report move
 end
 
-to move-diag-tr
-  if(gang_legal_movement = "DIAGONALS")
-  [
+to-report move-diag-tr
+  let move []
     let next-x xcor + 1
     let next-y ycor - 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 125
-  ]
+  report move
 end
 
-to move-diag-bl
-  if(gang_legal_movement = "DIAGONALS")
-  [
+to-report move-diag-bl
+  let move []
     let next-x xcor - 1
     let next-y ycor + 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 170
-  ]
+  report move
 end
 
 
-to move-diag-br
-  if(gang_legal_movement = "DIAGONALS")
-  [
+to-report move-diag-br
+  let move []
     let next-x xcor - 1
     let next-y ycor - 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 215
-  ]
+  report move
 end
 
 
-to move-ahead
-  if(gang_legal_movement = "HORIZONTALS" or gang_legal_movement = "ORTHOGONAL")
-  [
+to-report move-ahead
+  let move []
     let next-x xcor + 1
     let next-y ycor + 0
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 90
-  ]
+  report move
 end
 
-to move-back
-  if(gang_legal_movement = "HORIZONTALS" or gang_legal_movement = "ORTHOGONAL")
-  [
+to-report move-back
+  let move []
     let next-x xcor - 1
     let next-y ycor + 0
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 270
-  ]
+  report move
 end
 
-to move-up
-  if(gang_legal_movement = "VERTICALS" or gang_legal_movement = "ORTHOGONAL")
-  [
+to-report move-up
+  let move []
     let next-x xcor + 0
     let next-y ycor + 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 0
-  ]
+  report move
 end
 
-to move-down
-  if(gang_legal_movement = "VERTICALS" or gang_legal_movement = "ORTHOGONAL")
-  [
+to-report move-down
+  let move []
     let next-x xcor + 0
     let next-y ycor - 1
-    if legal-move? next-x next-y[
-      set xcor next-x
-      set ycor next-y
-    ]
+    set move list next-x next-y
     set heading 180
-  ]
+  report move
 end
 
 
@@ -918,8 +942,6 @@ to-report legal-move? [x y]
     (not any? wolves-on patch x y) and
     (not any? preys-on patch x y))
 end
-
-
 
  to-report posX
    report xcor
@@ -1071,7 +1093,7 @@ to-report episode-finished?
      [set end? 0 ]
   ]
   if end? = 1
-     [ set ole-count (ole-count + 1)
+     [ set preys-killed (preys-killed + 1)
      ]
   report  end? = 1 or time-steps > 3500
 end
@@ -1492,8 +1514,8 @@ end
 GRAPHICS-WINDOW
 248
 26
-753
-552
+984
+783
 -1
 -1
 33.0
@@ -1507,9 +1529,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-14
+21
 0
-14
+21
 0
 0
 1
@@ -1556,7 +1578,7 @@ BUTTON
 107
 100
 step
-tick
+go
 NIL
 1
 T
@@ -1576,7 +1598,7 @@ world_size
 world_size
 4
 100
-14
+21
 1
 1
 NIL
@@ -1591,7 +1613,7 @@ fov_percentage
 fov_percentage
 0
 50
-50
+21
 1
 1
 NIL
@@ -1599,19 +1621,9 @@ HORIZONTAL
 
 CHOOSER
 28
-263
+260
 199
-308
-prey_movement
-prey_movement
-"RANDOM" "REACTIVE" "FLEE" "NAIVE"
-0
-
-CHOOSER
-27
-418
-198
-463
+305
 gang_movement
 gang_movement
 "REACTIVE" "DELIBERATIVE" "LEARNING"
@@ -1627,101 +1639,36 @@ TEXTBOX
 0.0
 1
 
-CHOOSER
-26
-358
-199
-403
-gang_legal_movement
-gang_legal_movement
-"DIAGONALS" "ORTHOGONAL" "HORIZONTALS" "VERTICALS"
-1
-
 TEXTBOX
-54
-236
-204
-255
-Prey Parameters
-15
-0.0
-1
-
-TEXTBOX
-42
-331
-192
-350
+45
+232
+195
+251
 Predators Parameters
 15
 0.0
 1
 
 TEXTBOX
-43
-484
-193
-503
+44
+326
+194
+345
 Learning Parameters
 15
 0.0
 1
 
 SLIDER
-27
-516
-199
-549
-discount-factor
-discount-factor
-0
-1
-0
-0.01
-1
-NIL
-HORIZONTAL
-
-SLIDER
-27
-561
-199
-594
-learning-rate
-learning-rate
-0
-1
-0
-0.1
-1
-NIL
-HORIZONTAL
-
-SLIDER
-25
-608
-197
-641
-reward-value
-reward-value
-0
-5
-5
-0.2
-1
-NIL
-HORIZONTAL
-
-SLIDER
-20
-655
-218
-688
+13
+357
+211
+390
 max-episodes
 max-episodes
 0
 7000
-4950
+5000
 50
 1
 NIL
@@ -1745,10 +1692,10 @@ NIL
 1
 
 MONITOR
-305
-426
-477
-471
+22
+451
+194
+496
 time-steps
 get-time-steps
 17
@@ -1756,10 +1703,10 @@ get-time-steps
 11
 
 MONITOR
-307
-499
-479
-544
+24
+524
+196
+569
 episode-count
 episode-count
 17
@@ -1767,10 +1714,10 @@ episode-count
 11
 
 PLOT
-523
-38
-889
-286
+1006
+60
+1372
+308
 Reward performance
 episode
 total-reward
@@ -1784,10 +1731,10 @@ false
 PENS
 
 PLOT
-523
-325
-890
-545
+1006
+343
+1373
+563
 Time performance
 episode
 time-steps
@@ -1800,6 +1747,49 @@ false
 "" ""
 PENS
 "time-steps" 1.0 0 -16777216 true "" ""
+
+MONITOR
+25
+641
+183
+686
+preys-killed
+preys-killed
+0
+1
+11
+
+MONITOR
+130
+579
+202
+624
+n-collisions
+n-collisions
+0
+1
+11
+
+MONITOR
+17
+579
+113
+624
+messages-sent
+messages-sent
+0
+1
+11
+
+TEXTBOX
+70
+418
+220
+437
+Monitors
+15
+0.0
+1
 
 @#$#@#$#@
 ## WHAT IS IT?
