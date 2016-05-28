@@ -300,6 +300,11 @@ to-report adjacent-positions-of-type [pos ]
 
   set solution fput (list ((x + 1) mod (world_size + 1)) y) solution
 
+
+   foreach solution
+  [ if not (legal-move? (first ?) (last ?))
+    [ set solution remove ? solution ]
+  ]
   report solution
 end
 
@@ -1287,12 +1292,12 @@ to-report select-action [x y]
   let myY ycor
   let myID label
 
-
   ask preys [
-    set preyAvailable in-range-pos myX myY
     set preyX xcor
     set preyY ycor
   ]
+
+  set preyAvailable in-range-pos preyX preyY
 
   let bestResult [-1 -1]
   let finalTarget []
@@ -1487,8 +1492,8 @@ end
 GRAPHICS-WINDOW
 248
 26
-493
-222
+753
+552
 -1
 -1
 33.0
@@ -1502,9 +1507,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-4
+14
 0
-4
+14
 0
 0
 1
@@ -1571,7 +1576,7 @@ world_size
 world_size
 4
 100
-4
+14
 1
 1
 NIL
