@@ -8,9 +8,7 @@ extensions [array]
 ;;; time-steps: number of time-steps in the current episode.
 ;;; episode-count: total number of episodes
 
-globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count total-time-steps]
-
-
+globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count ole-count]
 ;;;
 ;;;  Declare two types of turtles
 ;;;
@@ -43,8 +41,8 @@ preys-own [fov init_xcor inity_cor]
 ;;;  =================================================================
 ;;;      Interface reports
 ;;;  =================================================================
-to-report get-total-time-steps
-  report total-time-steps
+to-report get-time-steps
+  report time-steps
 end
 
 to-report get-episode-count
@@ -139,26 +137,37 @@ to reset
   ;; the beginning of your setup procedure and reset-ticks at the end
   ;; of the procedure.)
   ;;__clear-all-and-reset-ticks
+
   ask wolves[
-      set total-reward 0
+        ;set-current-plot-pen (word who "reward")
+      ;set total-reward 0
 
       ;resetar posições
+
       set xcor init_xcor
       set ycor init_ycor
+      set episode-count (episode-count + 1)
+  set time-steps 0
+
+  ; linearly decrease explorations over time
+  set epsilon max list 0 (1 - (episode-count / max-episodes))
+  set temperature max list 0.8 (epsilon * 10)
     ]
 
-      set episode-count (episode-count + 1)
-      set time-steps 0
 
-      set epsilon max list 0 (1 - (episode-count / max-episodes))
-      set temperature max list 0.8 (epsilon * 10)
 
 
 end
 
 to go
   tick
-
+  if episode-finished? [
+    reset
+    if episode-count >= max-episodes [
+      show ole-count
+      stop
+      ]
+    ]
 
     ask preys[
     prey-loop
@@ -167,6 +176,7 @@ to go
     wolf-loop
   ]
 
+   set time-steps (time-steps + 1)
 
 end
 
@@ -179,25 +189,21 @@ to wolf-loop
     [
     ifelse(gang_movement = "DELIBERATIVE")
     [
+
+
+
       deliberative-loop
     ]
     [
     ifelse( gang_movement = "LEARNING")
     [
-    ifelse episode-finished? [
-    reset
-    if episode-count >= max-episodes [stop]
-    ]
-    [
+
          wolf-learning-loop
-    set total-time-steps (total-time-steps + 1)
-    show total-time-steps
+    ]
+    []
     ]
     ]
-      [
-    ]
-    ]
-    ]
+
 
 end
 
@@ -1006,18 +1012,21 @@ to-report get-reward [action]
      set preyY ycor
   ]
 
-  let returnValue 1
+  let returnValue 5
   ask wolves [
     let vector distanceVector preyX preyY
     if abs (first vector) + abs ( last vector) > 1[
       set returnValue -0.1
+    ]
+    if not in-range-pos preyX preyY [
+      set returnValue -1
     ]
   ]
 
   let vector2 distanceVector preyX preyY
   if abs (first vector2) + abs ( last vector2) = 1
   [
-    set returnValue 0.5
+    set returnValue 2
   ]
 
   report returnValue
@@ -1028,28 +1037,21 @@ end;
 
 to-report episode-finished?
   let end? 1
-  let right? 0
-  let left? 0
-  let up? 0
-  let down? 0
   let preyX 0
   let preyY 0
   ask preys[
     set preyX xcor
     set preyY ycor
   ]
-
-  ask wolves [
-  if (xcor = preyX + 1) and (ycor = preyY)
-      [ set right? 1]
-  if (xcor = preyX - 1) and (ycor = preyY)
-      [set left? 1]
-  if ( xcor = preyX) and (ycor = preyY + 1)
-      [ set up? 1]
-  if (xcor = preyX) and (ycor = preyY - 1)
-      [set down? 1]
+  ask wolves[
+    let vector2 distanceVector preyX preyY
+  if abs (first vector2) + abs ( last vector2) != 1
+     [set end? 0 ]
   ]
-  report (left? = 1) and (right? = 1) and (up? = 1) and (down? = 1)
+  if end? = 1
+     [ set ole-count (ole-count + 1)
+     ]
+  report  end? = 1 or time-steps > 1500
 end
 
  to-report get-max-Q-value[partnerID partnerX partnerY preyX preyY]
@@ -1251,7 +1253,9 @@ to-report execute-action [action qIndex]
      ]
    ]
 
-   set time-steps (time-steps + 1)
+
+
+
 
    report qIndex
  end
@@ -1469,7 +1473,7 @@ GRAPHICS-WINDOW
 222
 -1
 -1
-15.0
+33.0
 1
 10
 1
@@ -1480,9 +1484,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-10
+4
 0
-10
+4
 0
 0
 1
@@ -1547,9 +1551,9 @@ SLIDER
 178
 world_size
 world_size
-10
+4
 100
-10
+4
 1
 1
 NIL
@@ -1564,7 +1568,7 @@ fov_percentage
 fov_percentage
 0
 50
-49
+50
 1
 1
 NIL
@@ -1649,7 +1653,7 @@ discount-factor
 discount-factor
 0
 1
-0.13
+0
 0.01
 1
 NIL
@@ -1664,7 +1668,7 @@ learning-rate
 learning-rate
 0
 1
-1
+0
 0.1
 1
 NIL
@@ -1686,46 +1690,16 @@ NIL
 HORIZONTAL
 
 SLIDER
-15
-748
-213
-781
+20
+655
+218
+688
 max-episodes
 max-episodes
 0
-1000
+7000
+3500
 50
-50
-1
-NIL
-HORIZONTAL
-
-SLIDER
-14
-654
-214
-687
-hit-wolf-reward
-hit-wolf-reward
--1
-0
-0
-0.01
-1
-NIL
-HORIZONTAL
-
-SLIDER
-14
-701
-212
-734
-sheep-out-of-range-reward
-sheep-out-of-range-reward
--1
-0
--0.01
-0.01
 1
 NIL
 HORIZONTAL
@@ -1746,6 +1720,46 @@ NIL
 NIL
 NIL
 1
+
+MONITOR
+315
+287
+395
+332
+time-steps
+get-time-steps
+17
+1
+11
+
+MONITOR
+322
+360
+426
+405
+episode-count
+episode-count
+17
+1
+11
+
+PLOT
+523
+38
+723
+188
+Reward performance
+NIL
+NIL
+0.0
+10.0
+0.0
+10.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -16777216 true "set-current-plot \"Reward performance\"" "plot total-reward"
 
 @#$#@#$#@
 ## WHAT IS IT?
