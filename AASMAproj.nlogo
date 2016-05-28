@@ -66,12 +66,13 @@ to set-globals
   set temperature 100
 
   set ACTION-LIST (list
+    list 0 0 ; idle
     list 0 1 ; go up (north)
     list 0 -1 ; go down (south)
     list 1 0 ; move ahead
     list -1 0 ; move back
     )
-  set NUM-ACTIONS 4
+  set NUM-ACTIONS 5
 end
 
 ;;;  Setup patches.
@@ -84,8 +85,8 @@ end
 
 
 to setup-turtles
-    set-default-shape  wolves "turtle"
-    set-default-shape preys  "cow"
+    set-default-shape  wolves "wolf"
+    set-default-shape preys  "sheep"
 
 
 create-wolves 4[
@@ -995,18 +996,23 @@ to pass-message [dir]
 
 
 to-report get-reward [action]
-  let next-x xcor + first action
-  let next-y ycor + last action
   let preyX 0
   let preyY 0
   let crash 0
+  let myPosX xcor
+  let myPosY ycor
+  let next-x xcor + (first action)
+  let next-y ycor + (last action)
    ask preys[
      set preyX xcor
      set preyY ycor
    ]
    ;hits prey
 
-   if (next-x = preyX) and (next-y = preyY)
+   if ((xcor = preyX - 1) and (ycor = preyY)) or
+      ((xcor = preyX + 1) and (ycor = preyY)) or
+      ((xcor = preyX) and (ycor = preyY - 1)) or
+      ((xcor = preyX) and (ycor = preyY + 1))
       [
         report reward-value
          ]
@@ -1025,6 +1031,7 @@ to-report get-reward [action]
       ifelse crash = 1
       [report hit-wolf-reward]
      [report 0]
+
 
    end; did it hit a wolf
 
@@ -1258,7 +1265,7 @@ fov_percentage
 fov_percentage
 0
 50
-50
+9
 1
 1
 NIL
@@ -1272,7 +1279,7 @@ CHOOSER
 prey_movement
 prey_movement
 "RANDOM" "REACTIVE" "FLEE" "NAIVE"
-2
+3
 
 CHOOSER
 27
