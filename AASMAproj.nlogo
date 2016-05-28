@@ -1740,10 +1740,10 @@ NIL
 1
 
 MONITOR
-315
-287
-395
-332
+305
+426
+477
+471
 time-steps
 get-time-steps
 17
@@ -1751,10 +1751,10 @@ get-time-steps
 11
 
 MONITOR
-322
-360
-426
-405
+307
+499
+479
+544
 episode-count
 episode-count
 17
