@@ -34,7 +34,8 @@ breed [preys prey]
 ;;; total-reward: cumulative reward so far
 ;;; init_xcor: initial xcor for reset
 ;;; init_ycor
-wolves-own[fov wolves_plan told_plan Q-values reward total-reward init_xcor init_ycor previous-xcor previous-ycor]
+wolves-own[fov wolves_plan told_plan Q-values no-partner-Q-values no-prey-Q-values no-one-Q-values reward total-reward
+           init_xcor init_ycor]
 preys-own [fov init_xcor inity_cor]
 ;;;
 ;;;
@@ -100,9 +101,10 @@ create-wolves 4[
   set-random-position
   set init_xcor xcor
   set init_ycor ycor
-  set previous-xcor (xcor + max-pxcor)
-  set previous-ycor (ycor + max-pycor)
   set Q-values get-initial-Q-values
+  set no-partner-Q-values get-initial-no-partner-Q-values
+  set no-prey-Q-values get-initial-no-prey-Q-values
+  set no-one-Q-values get-initial-no-one-Q-values
   set reward 0
   set total-reward 0
 ]
@@ -143,8 +145,6 @@ to reset
       ;resetar posições
       set xcor init_xcor
       set ycor init_ycor
-      set previous-xcor xcor
-      set previous-ycor ycor
     ]
 
       set episode-count (episode-count + 1)
@@ -472,18 +472,20 @@ end
 ;;;
 
 to wolf-learning-loop
-  let action select-action xcor ycor
+  let tuple select-action xcor ycor
+
+  let action first tuple
+  let qIndex last tuple
 
   ;executes action
-  execute-action action
-
+  set qIndex execute-action action qIndex
   ; gets reward
   set reward get-reward action
   set total-reward (total-reward + reward)
 
   ;updates Q-value function Q-value function
 
-  update-Q-value action
+  update-Q-value action qIndex
 end
 
 
@@ -998,42 +1000,21 @@ to pass-message [dir]
 to-report get-reward [action]
   let preyX 0
   let preyY 0
-  let crash 0
-  let myPosX xcor
-  let myPosY ycor
-  let next-x xcor + (first action)
-  let next-y ycor + (last action)
-   ask preys[
+  ask preys[
      set preyX xcor
      set preyY ycor
-   ]
-   ;hits prey
+  ]
 
-   if ((xcor = preyX - 1) and (ycor = preyY)) or
-      ((xcor = preyX + 1) and (ycor = preyY)) or
-      ((xcor = preyX) and (ycor = preyY - 1)) or
-      ((xcor = preyX) and (ycor = preyY + 1))
-      [
-        report reward-value
-         ]
   ask wolves [
-    ;hits wolf
-     if ( next-x = xcor) and (next-y = ycor)
-       [
-          set crash 1
-          ]
-   ]
-       ;out of sheep's range
-      if not in-range-pos preyX preyY
-         [
-           report sheep-out-of-range-reward
-           ]
-      ifelse crash = 1
-      [report hit-wolf-reward]
-     [report 0]
+    let vector distanceVector preyX preyY
+    if abs (first vector) + abs ( last vector) > 1[
+      report -0.1
+    ]
+  ]
 
+  report 1
 
-   end; did it hit a wolf
+end;
 
 
 
@@ -1063,20 +1044,38 @@ to-report episode-finished?
   report (left? = 1) and (right? = 1) and (up? = 1) and (down? = 1)
 end
 
- to-report get-max-Q-value[x y]
-   report max array:to-list get-Q-values x y
+ to-report get-max-Q-value[partnerID partnerX partnerY preyX preyY]
+   report max array:to-list get-Q-values partnerID partnerX partnerY preyX preyY
  end
 
- to set-Q-value [x y action value]
-   array:set (get-Q-values x y) (get-action-index action) value
+ to set-Q-value [partnerID partnerX partnerY preyX preyY action value]
+   array:set (get-Q-values partnerID partnerX partnerY preyX preyY) (get-action-index action) value
  end
 
- to-report get-Q-values [x y]
-   report array:item (array:item Q-values x) y
+ to-report get-Q-values [partnerID partnerX partnerY preyX preyY]
+   let middle fov
+   let partnerPos distanceVector partnerX partnerY
+   set partnerPos list (fov + first partnerPos) (fov + last partnerPos)
+
+   let preyPos distanceVector preyX preyY
+   set preyPos list (fov + first preyPos) (fov + last preyPos)
+
+   if partnerID > label
+   [ set partnerID (partnerID - 1)]
+
+   report (array:item
+           (array:item
+            (array:item
+             (array:item
+              (array:item Q-values partnerID)
+             first partnerPos)
+            last partnerPos)
+           first preyPos)
+          last preyPos)
  end
 
- to-report get-Q-value [x y action]
-   let action-values get-Q-values x y
+ to-report get-Q-value [partnerID partnerX partnerY preyX preyY action]
+   let action-values get-Q-values partnerID partnerX partnerY preyX preyY
    report array:item action-values (get-action-index action)
  end
 
@@ -1084,20 +1083,116 @@ end
    report position action ACTION-LIST
  end
 
- to-report get-initial-Q-values
-   report array:from-list n-values world-width[
-     array:from-list n-values world-height[
-       array:from-list n-values NUM-ACTIONS[0]]]
+ to-report get-max-no-partner-Q-value[partnerID preyX preyY]
+   report max array:to-list get-no-partner-Q-values partnerID preyX preyY
  end
+
+ to set-no-partner-Q-value [partnerID preyX preyY action value]
+   array:set (get-no-partner-Q-values partnerID preyX preyY) (get-action-index action) value
+ end
+
+ to-report get-no-partner-Q-values [partnerID preyX preyY]
+   let middle fov
+
+   let preyPos distanceVector preyX preyY
+   set preyPos list (fov + first preyPos) (fov + last preyPos)
+
+   report (array:item
+           (array:item
+              (array:item no-partner-Q-values partnerID)
+           first preyPos)
+          last preyPos)
+ end
+
+ to-report get-no-partner-Q-value [partnerID preyX preyY action]
+   let action-values get-no-partner-Q-values partnerID preyX preyY
+   report array:item action-values (get-action-index action)
+ end
+
+
+to-report get-no-prey-Q-values [partnerID partnerX partnerY]
+   let middle fov
+   let partnerPos distanceVector partnerX partnerY
+   set partnerPos list (fov + first partnerPos) (fov + last partnerPos)
+
+
+   if partnerID > label
+   [ set partnerID (partnerID - 1)]
+
+   report  (array:item
+            (array:item
+             (array:item no-prey-Q-values partnerID)
+            first partnerPos)
+           last partnerPos)
+ end
+
+ to-report get-no-prey-Q-value [partnerID partnerX partnerY action]
+   let action-values get-no-prey-Q-values partnerID partnerX partnerY
+   report array:item action-values (get-action-index action)
+ end
+
+ to-report get-max-no-prey-Q-value[partnerID partnerX partnerY]
+   report max array:to-list get-no-prey-Q-values partnerID partnerX partnerY
+ end
+
+ to set-no-prey-Q-value [partnerID partnerX partnerY action value]
+   array:set (get-no-prey-Q-values partnerID partnerX partnerY) (get-action-index action) value
+ end
+
+ to-report get-no-one-Q-values [partnerID]
+   if partnerID > label
+   [ set partnerID (partnerID - 1)]
+
+   report array:item no-one-Q-values partnerID
+ end
+
+ to-report get-no-one-Q-value [partnerID action]
+   let action-values get-no-one-Q-values partnerID
+   report array:item action-values (get-action-index action)
+ end
+
+ to-report get-initial-Q-values
+   let arraySize (fov * 2 + 1)
+
+   report array:from-list n-values 3[
+          array:from-list n-values arraySize[
+          array:from-list n-values arraySize[
+          array:from-list n-values arraySize[
+          array:from-list n-values arraySize[
+          array:from-list n-values NUM-ACTIONS[0]]]]]]
+ end
+
+ to-report get-initial-no-partner-Q-values
+   let arraySize (fov * 2 + 1)
+
+   report array:from-list n-values 3[
+          array:from-list n-values arraySize[
+          array:from-list n-values arraySize[
+          array:from-list n-values NUM-ACTIONS[0]]]]
+ end
+
+
+ to-report get-initial-no-prey-Q-values
+   let arraySize (fov * 2 + 1)
+
+   report array:from-list n-values 3[
+          array:from-list n-values arraySize[
+          array:from-list n-values arraySize[
+          array:from-list n-values NUM-ACTIONS[0]]]]
+ end
+
+ to-report get-initial-no-one-Q-values
+   report array:from-list n-values 3[
+          array:from-list n-values NUM-ACTIONS[0]]
+ end
+
 ;;;
 ;;; ------------------------
 ;;;   Learning
 ;;; ------------------------
 ;;;
-to execute-action [action]
-   ;save previous position
-   set previous-xcor xcor
-   set previous-ycor ycor
+to-report execute-action [action qIndex]
+
 
    ;saves new position if  action goes to a legal state
 
@@ -1108,30 +1203,129 @@ to execute-action [action]
    [
      set xcor next-x
      set ycor next-y
+
+     let partnerX item 1 qIndex
+     let partnerY item 2 qIndex
+     let preyX item 3 qIndex
+     let preyY item 4 qIndex
+
+     if partnerX != -1
+     [
+       set qIndex replace-item 1 qIndex (partnerX + first action)
+     ]
+
+
+     if partnerY != -1
+     [
+       set qIndex replace-item 2 qIndex (partnerY + last action)
+     ]
+
+
+     if preyX != -1
+     [
+       set qIndex replace-item 3 qIndex (preyX + first action)
+     ]
+
+     if preyY != -1
+     [
+       set qIndex replace-item 4 qIndex (preyY + last action)
+     ]
    ]
 
    set time-steps (time-steps + 1)
+
+   report qIndex
  end
 
 
 to-report select-action [x y]
-  report select-action-soft-max x y
+  let preyAvailable false
+  let preyX 0
+  let preyY 0
+  let myX xcor
+  let myY ycor
+  let myID label
+
+
+  ask preys [
+    set preyAvailable in-range-pos myX myY
+    set preyX xcor
+    set preyY ycor
+  ]
+
+  let bestResult [-1 -1]
+  let finalTarget []
+
+  ask wolves [
+    let result []
+    let target []
+
+    if label != myID
+    [
+      ifelse in-range-pos myX myY
+      [
+        ifelse preyAvailable
+        [
+          set result select-action-soft-max label xcor ycor preyX preyY
+          set target (list label xcor ycor preyX preyY)
+        ]
+        [
+          set result select-action-soft-max-no-prey label xcor ycor
+          set target (list label xcor ycor -1 -1)
+        ]
+      ]
+      [
+        ifelse preyAvailable
+        [
+          set result select-action-soft-max-no-partner label preyX preyY
+          set target (list label -1 -1 preyX preyY)
+        ]
+        [
+          set result select-action-soft-max-no-one label
+          set target (list label -1 -1 -1 -1)
+        ]
+      ]
+
+      if first bestResult = -1 or last bestResult < result
+      [
+        set bestResult result
+        set finalTarget target
+      ]
+    ]
+  ]
+
+  report list first bestResult finalTarget
 
  end
-
-to update-Q-value [action]
-  update-Q-learning action
-end
 
 ;;;
 ;;;  Chooses an action according to the soft-max method.
 ;;;
 ;;;
 
-to-report select-action-soft-max [x y]
+to-report select-action-soft-max [partnerID partnerX partnerY preyX preyY]
+  let action-values array:to-list (get-Q-values partnerID partnerX partnerY preyX preyY)
+  report endSoftMax action-values
+end
 
-  ; gets action probs
-  let action-values array:to-list (get-Q-values x y)
+
+to-report select-action-soft-max-no-prey [partnerID partnerX partnerY]
+  let action-values array:to-list (get-no-prey-Q-values partnerID partnerX partnerY)
+  report endSoftMax action-values
+end
+
+
+to-report select-action-soft-max-no-partner [partnerID preyX preyY]
+  let action-values array:to-list (get-no-partner-Q-values partnerID preyX preyY)
+  report endSoftMax action-values
+end
+
+to-report select-action-soft-max-no-one [partnerID]
+  let action-values array:to-list (get-no-one-Q-values partnerID)
+  report endSoftMax action-values
+end
+
+to-report endSoftMax[action-values]
   let action-probs map [ ( exp (? / temperature)) ] action-values
   let sum-q sum action-probs
   set action-probs map [? / sum-q ] action-probs
@@ -1145,22 +1339,101 @@ to-report select-action-soft-max [x y]
     set action-index ( action-index + 1)
     set prob-sum ( prob-sum + (item action-index action-probs))
   ]
-  report item action-index ACTION-LIST
+
+  report list item action-index ACTION-LIST item action-index action-values
+
 end
 
-to update-Q-learning [action]
-  ;get previous Q-value
-  let previous-Q-value (get-Q-value previous-xcor previous-ycor action)
 
-  ; get funny math expression
-  let prediction-error (reward + ( discount-factor * get-max-Q-value xcor ycor) - previous-Q-value)
-
-; get funny math part 2
-  let new-Q-value (previous-Q-value + ( learning-rate * prediction-error))
+to update-Q-value [action qIndex]
+  update-Q-learning action qIndex
+end
 
 
- ;sets new Q-value
- set-Q-value previous-xcor previous-ycor action new-Q-value
+to update-Q-learning [action qIndex]
+  let prevPartnerId item 0 qIndex
+  let prevPartnerX item 1 qIndex
+  let prevPartnerY item 2 qIndex
+  let prevPreyX item 3 qIndex
+  let prevPreyY item 4 qIndex
+
+  let no-partner? prevPartnerX = -1
+  let no-prey? prevPreyX = -1
+  let no-one? no-partner? and no-prey?
+
+  let previous-Q-value 0
+
+  ifelse no-partner?
+  [
+    ifelse no-one?
+    [
+      set previous-Q-value (get-no-one-Q-value prevPartnerId action)
+      set-no-one-Q-value prevPartnerId action (get-new-Q-value partnerID previous-Q-value)
+    ]
+    [
+      set previous-Q-value (get-no-partner-Q-value prevPartnerId prevPreyX prevPreyY action)
+      set-no-partner-Q-value prevPartnerId prevPreyX prevPreyY action (get-new-Q-value partnerID previous-Q-value)
+    ]
+  ]
+  [
+    ifelse no-prey?
+    [
+      set previous-Q-value (get-no-prey-Q-value prevPartnerId prevPartnerX prevPartnerY action)
+      set-no-prey-Q-value prevPartnerId prevPartnerX prevPartnerY action (get-new-Q-value partnerID previous-Q-value)
+    ]
+    [
+      set previous-Q-value (get-Q-value prevPartnerId prevPartnerX prevPartnerY prevPreyX prevPreyY action)
+      set-Q-value prevPartnerId prevPartnerX prevPartnerY prevPreyX prevPreyY action (get-new-Q-value partnerID previous-Q-value)
+    ]
+  ]
+
+end
+
+to-report get-new-Q-value [partnerID previous-Q-value]
+  let partnerX 0
+  let partnerY 0
+
+  let preyX 0
+  let preyY 0
+
+  let result 0
+
+  ask wolf partnerID
+  [
+    set partnerX xcor
+    set partnerY ycor
+  ]
+
+  ask preys
+  [
+    set preyX xcor
+    set preyY ycor
+  ]
+
+  ifelse in-range-pos partnerX partnerY
+  [
+    ifelse in-range-pos preyX preyY
+    [
+      set result get-max-Q-value label partnerX partnerY preyX preyY
+    ]
+    [
+      set result get-no-prey-max-Q-value label partnerX partnerY
+    ]
+  ]
+  [
+    ifelse preyAvailable
+    [
+      set result get-no-partner-max-Q-value label preyX preyY
+
+    ]
+    [
+      set result get-no-one-max-Q-value label
+    ]
+  ]
+
+  let prediction-error (reward + ( 0.9 * result) - previous-Q-value)
+  report (previous-Q-value + ( 0.1 * prediction-error))
+
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
