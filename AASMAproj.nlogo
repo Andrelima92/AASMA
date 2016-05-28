@@ -1151,6 +1151,14 @@ to-report get-no-prey-Q-values [partnerID partnerX partnerY]
    report array:item action-values (get-action-index action)
  end
 
+ to-report get-max-no-one-Q-value[partnerID]
+   report max array:to-list get-no-one-Q-values partnerID
+ end
+
+ to set-no-one-Q-value [partnerID action value]
+   array:set (get-no-one-Q-values partnerID) (get-action-index action) value
+ end
+
  to-report get-initial-Q-values
    let arraySize (fov * 2 + 1)
 
@@ -1368,22 +1376,22 @@ to update-Q-learning [action qIndex]
     ifelse no-one?
     [
       set previous-Q-value (get-no-one-Q-value prevPartnerId action)
-      set-no-one-Q-value prevPartnerId action (get-new-Q-value partnerID previous-Q-value)
+      set-no-one-Q-value prevPartnerId action (get-new-Q-value prevPartnerId previous-Q-value)
     ]
     [
       set previous-Q-value (get-no-partner-Q-value prevPartnerId prevPreyX prevPreyY action)
-      set-no-partner-Q-value prevPartnerId prevPreyX prevPreyY action (get-new-Q-value partnerID previous-Q-value)
+      set-no-partner-Q-value prevPartnerId prevPreyX prevPreyY action (get-new-Q-value prevPartnerId previous-Q-value)
     ]
   ]
   [
     ifelse no-prey?
     [
       set previous-Q-value (get-no-prey-Q-value prevPartnerId prevPartnerX prevPartnerY action)
-      set-no-prey-Q-value prevPartnerId prevPartnerX prevPartnerY action (get-new-Q-value partnerID previous-Q-value)
+      set-no-prey-Q-value prevPartnerId prevPartnerX prevPartnerY action (get-new-Q-value prevPartnerId previous-Q-value)
     ]
     [
       set previous-Q-value (get-Q-value prevPartnerId prevPartnerX prevPartnerY prevPreyX prevPreyY action)
-      set-Q-value prevPartnerId prevPartnerX prevPartnerY prevPreyX prevPreyY action (get-new-Q-value partnerID previous-Q-value)
+      set-Q-value prevPartnerId prevPartnerX prevPartnerY prevPreyX prevPreyY action (get-new-Q-value prevPartnerId previous-Q-value)
     ]
   ]
 
@@ -1417,17 +1425,17 @@ to-report get-new-Q-value [partnerID previous-Q-value]
       set result get-max-Q-value label partnerX partnerY preyX preyY
     ]
     [
-      set result get-no-prey-max-Q-value label partnerX partnerY
+      set result get-max-no-prey-Q-value label partnerX partnerY
     ]
   ]
   [
-    ifelse preyAvailable
+    ifelse in-range-pos preyX preyY
     [
-      set result get-no-partner-max-Q-value label preyX preyY
+      set result get-max-no-partner-Q-value label preyX preyY
 
     ]
     [
-      set result get-no-one-max-Q-value label
+      set result get-max-no-one-Q-value label
     ]
   ]
 
