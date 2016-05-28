@@ -191,6 +191,7 @@ to wolf-loop
     [
          wolf-learning-loop
     set total-time-steps (total-time-steps + 1)
+    show total-time-steps
     ]
     ]
       [
@@ -1011,6 +1012,12 @@ to-report get-reward [action]
     if abs (first vector) + abs ( last vector) > 1[
       set returnValue -0.1
     ]
+  ]
+
+  let vector2 distanceVector preyX preyY
+  if abs (first vector2) + abs ( last vector2) = 1
+  [
+    set returnValue 0.5
   ]
 
   report returnValue
