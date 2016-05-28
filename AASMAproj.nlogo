@@ -8,7 +8,7 @@ extensions [array]
 ;;; time-steps: number of time-steps in the current episode.
 ;;; episode-count: total number of episodes
 
-globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count]
+globals [NUM-ACTIONS ACTION-LIST epsilon temperature time-steps episode-count ole-count]
 ;;;
 ;;;  Declare two types of turtles
 ;;;
@@ -139,12 +139,19 @@ to reset
   ;;__clear-all-and-reset-ticks
 
   ask wolves[
-        set-current-plot-pen (word who "reward")
-      set total-reward 0
+        ;set-current-plot-pen (word who "reward")
+      ;set total-reward 0
 
       ;resetar posições
+
       set xcor init_xcor
       set ycor init_ycor
+      set episode-count (episode-count + 1)
+  set time-steps 0
+
+  ; linearly decrease explorations over time
+  set epsilon max list 0 (1 - (episode-count / max-episodes))
+  set temperature max list 0.8 (epsilon * 10)
     ]
 
 
@@ -156,7 +163,10 @@ to go
   tick
   if episode-finished? [
     reset
-    if episode-count >= max-episodes [stop]
+    if episode-count >= max-episodes [
+      show ole-count
+      stop
+      ]
     ]
 
     ask preys[
@@ -1039,8 +1049,9 @@ to-report episode-finished?
      [set end? 0 ]
   ]
   if end? = 1
-     [ show "ole"]
-  report  end? = 1 or time-steps > 3000
+     [ set ole-count (ole-count + 1)
+     ]
+  report  end? = 1 or time-steps > 1500
 end
 
  to-report get-max-Q-value[partnerID partnerX partnerY preyX preyY]
@@ -1459,10 +1470,10 @@ GRAPHICS-WINDOW
 248
 26
 493
-132
+222
 -1
 -1
-15.0
+33.0
 1
 10
 1
@@ -1657,7 +1668,7 @@ learning-rate
 learning-rate
 0
 1
-1
+0
 0.1
 1
 NIL
@@ -1679,46 +1690,16 @@ NIL
 HORIZONTAL
 
 SLIDER
-15
-748
-213
-781
+20
+655
+218
+688
 max-episodes
 max-episodes
 0
 7000
-7000
+3500
 50
-1
-NIL
-HORIZONTAL
-
-SLIDER
-14
-654
-214
-687
-hit-wolf-reward
-hit-wolf-reward
--1
-0
--0.26
-0.01
-1
-NIL
-HORIZONTAL
-
-SLIDER
-14
-701
-212
-734
-sheep-out-of-range-reward
-sheep-out-of-range-reward
--1
-0
--0.01
-0.01
 1
 NIL
 HORIZONTAL
@@ -1779,24 +1760,6 @@ false
 "" ""
 PENS
 "default" 1.0 0 -16777216 true "set-current-plot \"Reward performance\"" "plot total-reward"
-
-PLOT
-507
-224
-707
-374
-plot 1
-NIL
-NIL
-0.0
-10.0
-0.0
-10.0
-true
-false
-"" ""
-PENS
-"default" 1.0 0 -16777216 true "set-current-plot \"Time performance\"\n  set-current-plot-pen \"time-steps\"" "plot time-steps"
 
 @#$#@#$#@
 ## WHAT IS IT?
