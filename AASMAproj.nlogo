@@ -1005,14 +1005,15 @@ to-report get-reward [action]
      set preyY ycor
   ]
 
+  let returnValue 1
   ask wolves [
     let vector distanceVector preyX preyY
     if abs (first vector) + abs ( last vector) > 1[
-      report -0.1
+      set returnValue -0.1
     ]
   ]
 
-  report 1
+  report returnValue
 
 end;
 
@@ -1096,6 +1097,9 @@ end
 
    let preyPos distanceVector preyX preyY
    set preyPos list (fov + first preyPos) (fov + last preyPos)
+
+   if partnerID > label
+   [ set partnerID (partnerID - 1)]
 
    report (array:item
            (array:item
@@ -1270,34 +1274,41 @@ to-report select-action [x y]
 
     if label != myID
     [
-      ifelse in-range-pos myX myY
-      [
-        ifelse preyAvailable
-        [
-          set result select-action-soft-max label xcor ycor preyX preyY
-          set target (list label xcor ycor preyX preyY)
-        ]
-        [
-          set result select-action-soft-max-no-prey label xcor ycor
-          set target (list label xcor ycor -1 -1)
-        ]
-      ]
-      [
-        ifelse preyAvailable
-        [
-          set result select-action-soft-max-no-partner label preyX preyY
-          set target (list label -1 -1 preyX preyY)
-        ]
-        [
-          set result select-action-soft-max-no-one label
-          set target (list label -1 -1 -1 -1)
-        ]
-      ]
+      let partnerX xcor
+      let partnerY ycor
+      let partnerID label
 
-      if first bestResult = -1 or last bestResult < result
-      [
-        set bestResult result
-        set finalTarget target
+      ask wolf myID [
+
+        ifelse in-range-pos partnerX partnerY
+        [
+          ifelse preyAvailable
+          [
+            set result select-action-soft-max partnerID partnerX partnerY preyX preyY
+            set target (list partnerID partnerX partnerY preyX preyY)
+          ]
+          [
+            set result select-action-soft-max-no-prey partnerID partnerX partnerY
+            set target (list partnerID partnerX partnerY -1 -1)
+          ]
+        ]
+        [
+          ifelse preyAvailable
+          [
+            set result select-action-soft-max-no-partner partnerID preyX preyY
+            set target (list partnerID -1 -1 preyX preyY)
+          ]
+          [
+            set result select-action-soft-max-no-one partnerID
+            set target (list partnerID -1 -1 -1 -1)
+          ]
+        ]
+
+        if first bestResult = -1 or last bestResult < last result
+        [
+          set bestResult result
+          set finalTarget target
+        ]
       ]
     ]
   ]
@@ -1422,20 +1433,20 @@ to-report get-new-Q-value [partnerID previous-Q-value]
   [
     ifelse in-range-pos preyX preyY
     [
-      set result get-max-Q-value label partnerX partnerY preyX preyY
+      set result get-max-Q-value partnerID partnerX partnerY preyX preyY
     ]
     [
-      set result get-max-no-prey-Q-value label partnerX partnerY
+      set result get-max-no-prey-Q-value partnerID partnerX partnerY
     ]
   ]
   [
     ifelse in-range-pos preyX preyY
     [
-      set result get-max-no-partner-Q-value label preyX preyY
+      set result get-max-no-partner-Q-value partnerID preyX preyY
 
     ]
     [
-      set result get-max-no-one-Q-value label
+      set result get-max-no-one-Q-value partnerID
     ]
   ]
 
@@ -1546,7 +1557,7 @@ fov_percentage
 fov_percentage
 0
 50
-9
+49
 1
 1
 NIL
@@ -1560,7 +1571,7 @@ CHOOSER
 prey_movement
 prey_movement
 "RANDOM" "REACTIVE" "FLEE" "NAIVE"
-3
+0
 
 CHOOSER
 27
